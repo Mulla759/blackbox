@@ -59,7 +59,7 @@ async function aiStatusMessage(params: {
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     const endpoint =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
     const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
