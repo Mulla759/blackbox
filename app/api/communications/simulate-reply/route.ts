@@ -10,9 +10,6 @@ type Body = {
   disaster_event_name?: string;
 };
 
-/**
- * Local/dev simulation of an inbound SMS (same parsing path as Twilio webhook).
- */
 export async function POST(req: Request) {
   let json: Body;
   try {

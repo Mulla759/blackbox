@@ -105,3 +105,27 @@ export function getLatestWellnessReplyAfter(
   }
   return null;
 }
+
+/** Conversation rows (SMS + voice) for one number, oldest → newest. */
+export function getConversationThreadForPhone(phone_number: string): Array<{
+  id: string;
+  timestamp: string;
+  channel: "sms" | "voice";
+  direction: "outbound" | "inbound";
+  body: string;
+  delivery_status?: string;
+}> {
+  const phone = normalizePhoneNumber(phone_number);
+  const rows = getState().logs.filter(
+    (row) => normalizePhoneNumber(row.phone_number) === phone
+  );
+  rows.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+  return rows.map((row) => ({
+    id: row.id,
+    timestamp: row.timestamp,
+    channel: row.channel,
+    direction: row.direction as "outbound" | "inbound",
+    body: row.body ?? "",
+    delivery_status: row.delivery_status,
+  }));
+}

@@ -10,6 +10,11 @@ export function normalizePhoneNumber(input: string): string {
   return input.trim();
 }
 
+/** Strict US E.164 checker for smoke-test flows (+1 followed by 10 digits). */
+export function isUsE164(phone: string): boolean {
+  return /^\+1\d{10}$/.test(phone.trim());
+}
+
 /** NANP area code for coarse regional analytics (US-centric). */
 export function extractAreaCode(e164: string): string | null {
   const d = e164.replace(/\D/g, "");

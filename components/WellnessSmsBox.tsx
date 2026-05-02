@@ -2,47 +2,64 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const POLL_MS = 2000;
-const POLL_CAP_MS = 180_000;
+type ThreadMsg = {
+  id: string;
+  timestamp: string;
+  channel: "sms" | "voice";
+  direction: "outbound" | "inbound";
+  body: string;
+  delivery_status?: string;
+};
+
+const POLL_MS = 2500;
 
 export function WellnessSmsBox() {
   const [phone, setPhone] = useState("");
-  const [sentSince, setSentSince] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState<string | null>(null);
+  const [mode, setMode] = useState<"sms" | "call" | "both">("both");
+  const [messages, setMessages] = useState<ThreadMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const pollStopRef = useRef<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const stopPolling = useCallback(() => {
-    if (pollStopRef.current !== null) {
-      window.clearInterval(pollStopRef.current);
-      pollStopRef.current = null;
-    }
+  const fetchThread = useCallback(async (raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed.length < 10) return;
+    const res = await fetch(
+      `/api/wellness-check/thread?phone=${encodeURIComponent(trimmed)}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return;
+    const data = (await res.json()) as { messages?: ThreadMsg[] };
+    setMessages(Array.isArray(data.messages) ? data.messages : []);
   }, []);
 
-  useEffect(() => () => stopPolling(), [stopPolling]);
-
-  async function pollOnce(since: string, normalizedPhone: string) {
-    const qs = new URLSearchParams({ phone: normalizedPhone, since });
-    const res = await fetch(`/api/wellness-check/reply?${qs}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return;
-    const data = (await res.json()) as {
-      reply?: { raw_message: string } | null;
-    };
-    if (data.reply?.raw_message) {
-      setReplyText(data.reply.raw_message);
-      stopPolling();
+  useEffect(() => {
+    const q = phone.trim();
+    if (q.length < 10) {
+      setMessages([]);
+      return;
     }
-  }
+    const t = window.setTimeout(() => void fetchThread(q), 450);
+    return () => window.clearTimeout(t);
+  }, [phone, fetchThread]);
+
+  useEffect(() => {
+    const q = phone.trim();
+    if (q.length < 10) return;
+    const id = window.setInterval(() => void fetchThread(q), POLL_MS);
+    return () => window.clearInterval(id);
+  }, [phone, fetchThread]);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({
+      top: listRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    stopPolling();
-    setReplyText(null);
     setSendError(null);
-
     const trimmed = phone.trim();
     if (!trimmed) return;
 
@@ -51,26 +68,24 @@ export function WellnessSmsBox() {
       const res = await fetch("/api/wellness-check/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: trimmed }),
+        body: JSON.stringify({ phone_number: trimmed, mode }),
       });
       const data = (await res.json()) as {
         error?: string;
-        sent_at?: string;
         phone_number?: string;
+        mode?: "sms" | "call" | "both";
         provider?: string;
-        twilio_message_sid?: string | null;
-        ok?: boolean;
         delivery_status?: string;
       };
 
-      if (!res.ok || !data.sent_at || !data.phone_number) {
+      if (!res.ok || !data.phone_number) {
         setSendError(data.error ?? "Could not send.");
         return;
       }
 
-      if (data.provider === "simulated") {
+      if (data.provider === "simulated" && mode !== "call") {
         setSendError(
-          "SMS is running in simulated mode (no carrier). Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to .env — TWILIO_PHONE_NUMBER must be your Twilio From number (E.164), then restart npm run dev."
+          "Simulated SMS only (no carrier). Add Twilio vars in .env and restart dev."
         );
         return;
       }
@@ -80,27 +95,52 @@ export function WellnessSmsBox() {
         return;
       }
 
-      setSentSince(data.sent_at);
-      void pollOnce(data.sent_at, data.phone_number);
-
-      const started = Date.now();
-      const pollPhone = data.phone_number;
-      const pollSince = data.sent_at;
-      pollStopRef.current = window.setInterval(() => {
-        if (Date.now() - started > POLL_CAP_MS) {
-          stopPolling();
-          return;
-        }
-        void pollOnce(pollSince, pollPhone);
-      }, POLL_MS);
+      setPhone(data.phone_number);
+      await fetchThread(data.phone_number);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col justify-center px-6 py-16">
-      <form onSubmit={handleSend} className="flex flex-col gap-4">
+    <div className="mx-auto max-w-lg px-6 py-10">
+      {/* Virtual SMS thread */}
+      <div
+        ref={listRef}
+        className="mb-8 flex max-h-[min(50vh,420px)] flex-col gap-3 overflow-y-auto border border-border bg-card/40 p-4"
+      >
+        {messages.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            Sent and received messages for this number will show here.
+          </p>
+        ) : (
+          messages.map((m) => {
+            const out = m.direction === "outbound";
+            return (
+              <div
+                key={m.id}
+                className={`max-w-[90%] border px-3 py-2 text-sm ${
+                  out
+                    ? "self-end border-accent/40 bg-accent/15 text-foreground"
+                    : "self-start border-border bg-background text-foreground"
+                }`}
+              >
+                <p className="mb-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">
+                  {out ? "Sent" : "Received"} · {m.channel} ·{" "}
+                  {new Date(m.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </p>
+                <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <form onSubmit={handleSend} className="flex flex-col gap-3">
         <label htmlFor="wellness-phone" className="sr-only">
           Phone number
         </label>
@@ -109,36 +149,32 @@ export function WellnessSmsBox() {
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          placeholder="+16124331186"
+          placeholder="+16124331186 (or leave blank to use TEST_RECIPIENT_NUMBER)"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="border border-border bg-card px-4 py-4 font-mono text-base text-foreground placeholder:text-muted-foreground/50 focus-visible:border-accent"
+          className="border border-border bg-card px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground/50 focus-visible:border-accent"
         />
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as "sms" | "call" | "both")}
+          className="border border-border bg-card px-3 py-2 font-mono text-xs uppercase tracking-[0.12em]"
+        >
+          <option value="sms">Text only</option>
+          <option value="call">Call only</option>
+          <option value="both">Call + text</option>
+        </select>
         <button
           type="submit"
-          disabled={busy || !phone.trim()}
-          className="border border-border bg-accent py-4 font-mono text-xs uppercase tracking-[0.2em] text-accent-foreground hover:opacity-90 disabled:opacity-40"
+          disabled={busy}
+          className="border border-border bg-accent py-3 font-mono text-xs uppercase tracking-[0.18em] text-accent-foreground hover:opacity-90 disabled:opacity-40"
         >
           {busy ? "Sending…" : "Send check-in"}
         </button>
       </form>
 
       {sendError ? (
-        <p className="mt-6 text-center text-sm text-[var(--state-critical)]">
+        <p className="mt-4 text-center text-sm text-[var(--state-critical)]">
           {sendError}
-        </p>
-      ) : null}
-
-      {replyText !== null ? (
-        <output
-          className="mt-14 block text-center font-mono text-2xl leading-relaxed text-foreground sm:text-3xl"
-          aria-live="polite"
-        >
-          {replyText}
-        </output>
-      ) : sentSince && !sendError ? (
-        <p className="mt-14 text-center font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Waiting for reply…
         </p>
       ) : null}
     </div>

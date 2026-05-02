@@ -1,5 +1,6 @@
 import { normalizePhoneNumber } from "./phone";
 import { attachOutboundDisasterContext } from "./store";
+import { send_call } from "./send-call";
 import { send_message } from "./send-message";
 import {
   WELLNESS_EVENT_ID,
@@ -9,6 +10,10 @@ import type { SendMessageResult } from "./types";
 
 export function buildWellnessCheckBody(): string {
   return `Are you okay? Reply YES if you need help, or NO if you don't need help.`;
+}
+
+export function buildWellnessCallPrompt(): string {
+  return "Hello, this is Blackbox emergency check-in. We are calling to check your safety status. Please reply to our text message with YES if you need help, or NO if you are okay.";
 }
 
 /**
@@ -29,6 +34,22 @@ export async function sendWellnessCheckSms(
   const to = normalizePhoneNumber(phone_number);
   const body = buildWellnessCheckBody();
   const outcome = await send_message(to, body);
+
+  if (outcome.delivery_status !== "failed" && !outcome.error) {
+    attachOutboundDisasterContext(to, WELLNESS_EVENT_ID, WELLNESS_EVENT_NAME);
+  }
+
+  return outcome;
+}
+
+export async function sendWellnessCheckCall(
+  phone_number: string
+): Promise<SendMessageResult> {
+  const to = normalizePhoneNumber(phone_number);
+  const outcome = await send_call(to, buildWellnessCallPrompt(), {
+    disaster_event_id: WELLNESS_EVENT_ID,
+    disaster_event_name: WELLNESS_EVENT_NAME,
+  });
 
   if (outcome.delivery_status !== "failed" && !outcome.error) {
     attachOutboundDisasterContext(to, WELLNESS_EVENT_ID, WELLNESS_EVENT_NAME);

@@ -127,17 +127,19 @@ export function AlertsDashboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           disaster_event_id: a.sourceId ?? undefined,
-          disaster_event_name: a.type,
+          disaster_event_name: `${a.type} (${a.severity})`,
+          registry_location_query: a.location,
         }),
       });
-      const data = (await res.json()) as { error?: string; results?: unknown[] };
+      const data = (await res.json()) as {
+        error?: string;
+        recipient_count?: number;
+      };
       if (!res.ok) {
         alert(data.error ?? "Outreach request failed");
         return;
       }
-      alert(
-        `Notifications queued: ${Array.isArray(data.results) ? data.results.length : 0} message(s).`
-      );
+      alert(`SMS queued for ${data.recipient_count ?? 0} recipient(s)`);
     } finally {
       setNotifyKey(null);
     }
@@ -166,16 +168,7 @@ export function AlertsDashboard({
               Active alerts
             </h1>
             <p className="mt-4 max-w-xl text-base text-foreground/65 leading-relaxed">
-              Filter by area text, severity, urgency, or event type. Data mirrors{" "}
-              <a
-                href="/api/alerts"
-                className="font-mono text-xs text-accent underline-offset-2 hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                /api/alerts
-              </a>
-              .
+              Filter by area text, severity, urgency, or event type.
             </p>
           </div>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
@@ -328,8 +321,9 @@ export function AlertsDashboard({
                     : "SMS outreach"}
                 </button>
                 <span className="text-[0.65rem] text-muted-foreground self-center">
-                  Uses saved recipients or{" "}
-                  <span className="font-mono text-[0.6rem]">DISASTER_NOTIFY_RECIPIENTS</span>
+                  Matches contacts in Analytics → Registry by location tokens (MN, counties, …). If no match,
+                  falls back to{" "}
+                  <span className="font-mono text-[0.6rem]">DISASTER_NOTIFY_RECIPIENTS</span>.
                 </span>
               </div>
             </li>

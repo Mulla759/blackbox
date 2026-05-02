@@ -44,14 +44,6 @@ export function SiteHeader() {
           >
             SMS check
           </Link>
-          <a
-            href="/api/alerts"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-sm border border-border bg-card px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/85 transition-colors hover:border-accent hover:text-accent"
-          >
-            API
-          </a>
         </nav>
       </div>
     </header>
