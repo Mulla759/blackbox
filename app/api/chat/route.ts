@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildDashboardData } from "@/lib/disaster-intel";
+import { buildDashboardDataLive } from "@/lib/disaster-intel";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +8,8 @@ type ChatReq = {
   context?: { active_disaster_id?: string };
 };
 
-function buildAggregateContext(disasterId: string) {
-  const dashboard = buildDashboardData(disasterId);
+async function buildAggregateContext(disasterId: string) {
+  const dashboard = await buildDashboardDataLive(disasterId);
   if (!dashboard) return null;
   return {
     disaster: dashboard.disaster,
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
 
-  const aggregate = buildAggregateContext(disasterId);
+  const aggregate = await buildAggregateContext(disasterId);
   if (!aggregate) {
     return NextResponse.json({ error: "Unknown disaster id context." }, { status: 404 });
   }
@@ -66,43 +66,59 @@ export async function POST(req: Request) {
 
   const endpoint =
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-  const response = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Question: ${message}\n\nAggregate dashboard context:\n${JSON.stringify(
-                aggregate
-              )}`,
-            },
-          ],
-        },
-      ],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  let text = "";
+  try {
+    const response = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  `Question: ${message}\n` +
+                  "Return: (1) situation summary, (2) top 3 actions, (3) accessibility support considerations, (4) shelter/hotspot priorities, (5) confidence caveat.\n\n" +
+                  `Aggregate dashboard context:\n${JSON.stringify(aggregate)}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.25, maxOutputTokens: 700 },
+      }),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    return NextResponse.json(
-      { error: `Gemini API error: ${errText.slice(0, 500)}` },
-      { status: 502 }
-    );
+    if (!response.ok) {
+      const errText = await response.text();
+      return NextResponse.json(
+        { error: `Gemini API error: ${errText.slice(0, 500)}` },
+        { status: 502 }
+      );
+    }
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    text =
+      payload.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text ?? "")
+        .join("")
+        .trim() || "";
+  } catch {
+    text = "";
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const payload = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text =
-    payload.candidates?.[0]?.content?.parts
-      ?.map((p) => p.text ?? "")
-      .join("")
-      .trim() || "No response generated.";
+  if (!text) {
+    text =
+      "Estimated priority summary: focus first on EXTREME/HIGH hotspots, then shelters with highest occupancy and accessibility readiness. " +
+      "Coordinate mobility support, hearing/vision support, and medical power support. This is an aggregate estimate, not a diagnosis.";
+  }
 
   return NextResponse.json({
     answer: text,

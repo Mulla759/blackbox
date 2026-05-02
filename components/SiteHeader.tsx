@@ -50,6 +50,18 @@ export function SiteHeader() {
           >
             Dashboard
           </Link>
+          <Link
+            href="/dispatcher/communications"
+            className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
+          >
+            Dispatcher
+          </Link>
+          <Link
+            href="/responder/contacts"
+            className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
+          >
+            Responder
+          </Link>
         </nav>
       </div>
     </header>

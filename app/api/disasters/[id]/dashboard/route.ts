@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildDashboardData } from "@/lib/disaster-intel";
+import { buildDashboardDataLive } from "@/lib/disaster-intel";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   const { id } = await ctx.params;
-  const data = buildDashboardData(id);
+  const data = await buildDashboardDataLive(id);
   if (!data) {
     return NextResponse.json({ error: "Disaster not found" }, { status: 404 });
   }

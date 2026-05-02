@@ -47,6 +47,106 @@ function finalStatusMessage(responseType: "safe" | "needs_help" | "emergency" | 
   return "Thank you for checking in with Blackbox.";
 }
 
+async function aiStatusMessage(params: {
+  responseType: "safe" | "needs_help" | "emergency" | "unknown";
+  eventName: string;
+  callerPhone: string;
+}): Promise<string> {
+  const key = process.env["GEMINI_API_KEY"]?.trim();
+  const fallback = finalStatusMessage(params.responseType);
+  if (!key) return fallback;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const endpoint =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  "Write one calm emergency IVR sentence (max 25 words). Use aggregate language only. " +
+                  `Response type: ${params.responseType}. Event: ${params.eventName}.`,
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 80 },
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return fallback;
+    const payload = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text =
+      payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim() ??
+      "";
+    return text || fallback;
+  } catch {
+    return fallback;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function escalationPhoneNumber(): string {
+  const configured = process.env["ESCALATION_PHONE_NUMBER"]?.trim();
+  if (configured) return normalizePhoneNumber(configured);
+  return "+16124331186";
+}
+
+function twilioCallerId(): string | undefined {
+  const from =
+    process.env["TWILIO_VOICE_FROM_NUMBER"]?.trim() ??
+    process.env["TWILIO_PHONE_NUMBER"]?.trim();
+  return from ? normalizePhoneNumber(from) : undefined;
+}
+
+function appendEscalationBridge(
+  twiml: twilio.twiml.VoiceResponse,
+  params: {
+    responseType: "safe" | "needs_help" | "emergency" | "unknown";
+    callerPhone: string;
+    eventId: string;
+    eventName: string;
+  }
+): void {
+  if (params.responseType !== "needs_help" && params.responseType !== "emergency") {
+    twiml.hangup();
+    return;
+  }
+
+  const escalationTo = escalationPhoneNumber();
+  const callerId = twilioCallerId();
+  appendCommunicationLog({
+    channel: "voice",
+    direction: "outbound",
+    phone_number: escalationTo,
+    body: `Escalation bridge requested for caller ${params.callerPhone}.`,
+    provider: "twilio_voice",
+    delivery_status: "queued",
+    disaster_event_id: params.eventId,
+    disaster_event_name: params.eventName,
+  });
+
+  twiml.say({ voice: "alice" }, "Please hold while we connect you to the Blackbox response lead now.");
+  const dial = callerId
+    ? twiml.dial({ callerId, answerOnBridge: true, timeout: 22 })
+    : twiml.dial({ answerOnBridge: true, timeout: 22 });
+  dial.number(escalationTo);
+  twiml.say(
+    { voice: "alice" },
+    "We could not reach the response lead right now. If this is life threatening, call 9 1 1 immediately."
+  );
+  twiml.hangup();
+}
+
 async function evaluateVoiceCheckpoint(params: {
   phone: string;
   responseType: "safe" | "needs_help" | "emergency" | "unknown";
@@ -234,8 +334,16 @@ export async function POST(req: Request) {
 
       if (digits === "2") {
         twiml.say({ voice: "alice" }, "Understood. No active disaster reported for your location.");
-        twiml.say({ voice: "alice" }, finalStatusMessage(responseType));
-        twiml.hangup();
+        twiml.say(
+          { voice: "alice" },
+          await aiStatusMessage({ responseType, eventName, callerPhone: phone })
+        );
+        appendEscalationBridge(twiml, {
+          responseType,
+          callerPhone: phone,
+          eventId,
+          eventName,
+        });
         return xmlResponse(twiml.toString());
       }
 
@@ -251,8 +359,16 @@ export async function POST(req: Request) {
           { voice: "alice" },
           `I could not find active state level alerts for ${state} right now.`
         );
-        twiml.say({ voice: "alice" }, finalStatusMessage(responseType));
-        twiml.hangup();
+        twiml.say(
+          { voice: "alice" },
+          await aiStatusMessage({ responseType, eventName, callerPhone: phone })
+        );
+        appendEscalationBridge(twiml, {
+          responseType,
+          callerPhone: phone,
+          eventId,
+          eventName,
+        });
         return xmlResponse(twiml.toString());
       }
 
@@ -293,8 +409,16 @@ export async function POST(req: Request) {
 
       if (!selected) {
         twiml.say({ voice: "alice" }, "No valid disaster option selected.");
-        twiml.say({ voice: "alice" }, finalStatusMessage(responseType));
-        twiml.hangup();
+        twiml.say(
+          { voice: "alice" },
+          await aiStatusMessage({ responseType, eventName, callerPhone: phone })
+        );
+        appendEscalationBridge(twiml, {
+          responseType,
+          callerPhone: phone,
+          eventId,
+          eventName,
+        });
         return xmlResponse(twiml.toString());
       }
 
@@ -319,8 +443,16 @@ export async function POST(req: Request) {
       });
 
       twiml.say({ voice: "alice" }, `You selected ${selected}.`);
-      twiml.say({ voice: "alice" }, finalStatusMessage(responseType));
-      twiml.hangup();
+      twiml.say(
+        { voice: "alice" },
+        await aiStatusMessage({ responseType, eventName: selected, callerPhone: phone })
+      );
+      appendEscalationBridge(twiml, {
+        responseType,
+        callerPhone: phone,
+        eventId,
+        eventName: selected,
+      });
       return xmlResponse(twiml.toString());
     }
 

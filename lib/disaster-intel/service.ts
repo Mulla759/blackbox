@@ -1,4 +1,5 @@
 import { SEEDED_DISASTER, SEEDED_SHELTERS } from "./mock-data";
+import { fetchActiveNwsAlerts } from "@/lib/disaster";
 import type {
   AccessibilityImpact,
   DisasterDashboardData,
@@ -37,6 +38,77 @@ export function listDisasters(): DisasterEvent[] {
 export function getDisasterById(id: string): DisasterEvent | null {
   if (id === SEEDED_DISASTER.id) return SEEDED_DISASTER;
   return null;
+}
+
+function hashToInt(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    h = (h << 5) - h + seed.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function disasterFromAlert(alert: {
+  sourceId?: string;
+  type: string;
+  location: string;
+  severity: string;
+  urgency: string;
+  description: string;
+  coordinates?: [number, number][];
+}): DisasterEvent | null {
+  const first = alert.coordinates?.[0];
+  if (!first || first.length < 2) return null;
+  const [lng, lat] = first;
+  const id = alert.sourceId ?? `${alert.type}-${alert.location}-${lat}-${lng}`;
+  const h = hashToInt(id);
+  const affectedPopulation = 20000 + (h % 220000);
+  const radius = 10 + (h % 45);
+  const pieces = alert.location.split(",");
+  const county = pieces[0]?.replace(/\b(county|parish)\b/gi, "").trim() || "Unknown";
+  const state = pieces[pieces.length - 1]?.trim() || "US";
+  const now = new Date().toISOString();
+  return {
+    id,
+    event_type: alert.type,
+    title: alert.type,
+    severity: alert.severity.toUpperCase(),
+    urgency: alert.urgency.toUpperCase(),
+    location_name: alert.location,
+    county,
+    state,
+    latitude: lat,
+    longitude: lng,
+    affected_radius_miles: radius,
+    affected_population: affectedPopulation,
+    description: alert.description || `${alert.type} in ${alert.location}`,
+    source: "NWS",
+    issued_at: now,
+    expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+    created_at: now,
+  };
+}
+
+function sheltersNearDisaster(disaster: DisasterEvent): Shelter[] {
+  const now = new Date().toISOString();
+  return SEEDED_SHELTERS.map((s, i) => {
+    const offsetLat = ((i % 3) - 1) * 0.11;
+    const offsetLng = ((i % 5) - 2) * 0.09;
+    const capacity = Math.max(180, s.capacity + ((hashToInt(disaster.id + i) % 220) - 110));
+    const occRate = 0.45 + ((hashToInt(`occ-${disaster.id}-${i}`) % 48) / 100);
+    return {
+      ...s,
+      id: `${disaster.id}-s-${i + 1}`,
+      latitude: Number((disaster.latitude + offsetLat).toFixed(4)),
+      longitude: Number((disaster.longitude + offsetLng).toFixed(4)),
+      city: disaster.county,
+      state: disaster.state,
+      capacity,
+      current_occupancy: Math.min(capacity, Math.round(capacity * occRate)),
+      created_at: now,
+    };
+  });
 }
 
 export function estimateAccessibilityImpact(disaster: DisasterEvent): AccessibilityImpact {
@@ -185,6 +257,45 @@ export function buildDashboardData(disasterId: string): DisasterDashboardData | 
   const shelters = prioritizeSheltersForDisaster(
     disaster,
     SEEDED_SHELTERS,
+    accessibility.estimated_mobility_support_needs +
+      accessibility.estimated_hearing_vision_support_needs
+  );
+  const hotspots = generateHotspots(
+    disaster,
+    shelters,
+    accessibility.estimated_mobility_support_needs +
+      accessibility.estimated_hearing_vision_support_needs
+  );
+
+  return {
+    disaster,
+    accessibility_impact: accessibility,
+    shelters,
+    hotspots,
+    map_center: { lat: disaster.latitude, lng: disaster.longitude },
+  };
+}
+
+export async function listDisastersLive(): Promise<DisasterEvent[]> {
+  const nws = await fetchActiveNwsAlerts();
+  if (!nws.ok) return [SEEDED_DISASTER];
+  const mapped = nws.alerts
+    .map(disasterFromAlert)
+    .filter((x): x is DisasterEvent => x !== null);
+  if (mapped.length === 0) return [SEEDED_DISASTER];
+  return mapped.slice(0, 80);
+}
+
+export async function buildDashboardDataLive(disasterId: string): Promise<DisasterDashboardData | null> {
+  const live = await listDisastersLive();
+  const disaster = live.find((d) => d.id === disasterId) ?? (disasterId === SEEDED_DISASTER.id ? SEEDED_DISASTER : null);
+  if (!disaster) return null;
+
+  const localShelters = sheltersNearDisaster(disaster);
+  const accessibility = estimateAccessibilityImpact(disaster);
+  const shelters = prioritizeSheltersForDisaster(
+    disaster,
+    localShelters,
     accessibility.estimated_mobility_support_needs +
       accessibility.estimated_hearing_vision_support_needs
   );

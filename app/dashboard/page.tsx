@@ -1,6 +1,6 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { DisasterIntelligenceDashboard } from "@/components/DisasterIntelligenceDashboard";
-import { buildDashboardData } from "@/lib/disaster-intel";
+import { buildDashboardDataLive, listDisastersLive } from "@/lib/disaster-intel";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,9 @@ function mapsApiKeyFromEnv(): string {
 }
 
 export default async function DashboardPage() {
-  const data = buildDashboardData("flood-rock-wi-2026-05-02");
+  const disasters = await listDisastersLive();
+  const firstId = disasters[0]?.id ?? "flood-rock-wi-2026-05-02";
+  const data = await buildDashboardDataLive(firstId);
   if (!data) {
     return (
       <>
@@ -28,7 +30,11 @@ export default async function DashboardPage() {
     <>
       <SiteHeader />
       <main className="flex-1">
-        <DisasterIntelligenceDashboard initialData={data} mapsApiKey={mapsApiKeyFromEnv()} />
+        <DisasterIntelligenceDashboard
+          initialData={data}
+          disasterOptions={disasters}
+          mapsApiKey={mapsApiKeyFromEnv()}
+        />
       </main>
     </>
   );
