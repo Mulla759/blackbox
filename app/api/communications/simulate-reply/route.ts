@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordInboundSms } from "@/lib/communications/inbound";
+import { resolveTribeDisasterIdForScoring } from "@/lib/communications/tribe-context";
 import { evaluateSignal } from "@/lib/tribe-v2";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     phone_number,
     channel: "sms",
     transcript: body,
-    disaster_id: recorded.disaster_event_id,
+    disaster_id: resolveTribeDisasterIdForScoring(recorded.disaster_event_id),
     disaster_name: recorded.disaster_event_name,
   });
 

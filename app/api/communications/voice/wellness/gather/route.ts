@@ -3,6 +3,7 @@ import { appendCommunicationLog, appendSafetyResponse } from "@/lib/communicatio
 import { normalizePhoneNumber } from "@/lib/communications/phone";
 import { getPublicAppBaseUrl } from "@/lib/communications/public-app-url";
 import { getActiveDisasterTypesForState } from "@/lib/disaster";
+import { resolveTribeDisasterIdForScoring } from "@/lib/communications/tribe-context";
 import { evaluateSignal } from "@/lib/tribe-v2";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,7 @@ async function evaluateVoiceCheckpoint(params: {
     phone_number: params.phone,
     channel: "voice",
     transcript: `Voice check-in response: ${statusText}. ${params.suffix ?? ""} Raw input: ${params.raw}`,
-    disaster_id: params.eventId,
+    disaster_id: resolveTribeDisasterIdForScoring(params.eventId),
     disaster_name: params.eventName,
   });
 }

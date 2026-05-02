@@ -34,21 +34,36 @@ The registry now supports:
 - latitude / longitude
 - communication preference and cadence
 
-Four synthetic demo profiles are seeded:
+Four demo profiles are hardcoded with real phone numbers for live demos.
+All four are co-located at **Ely, Lake County, MN** (47.9032 N, -91.8671 W)
+so the pins fall inside a live NWS alert zone. The dashboard already pulls
+alerts from api.weather.gov — the profiles just sit inside the polygon.
 
-- `demo-oxygen-elder`
-- `demo-asl-deaf`
-- `demo-spanish-wheelchair`
-- `demo-dialysis-insulin`
+| ID | Name | Phone | Notes |
+|---|---|---|---|
+| `demo-oxygen-elder` | Johnathan | +16125179429 | COPD, oxygen concentrator. Voice + SMS. |
+| `demo-asl-deaf` | Keith | +16513520203 | Deaf, ASL. **NEVER voice-call.** SMS only + ASL video for escalation. |
+| `demo-spanish-wheelchair` | Maria | +16124331186 | Spanish, wheelchair. Voice + SMS. |
+| `demo-dialysis-insulin` | Terry | +16123936826 | Dialysis, insulin. SMS preferred, urgent cadence. |
 
-The phone numbers default to safe `+1555...` placeholders. Override them with:
+Override any number via env if needed:
 
-- `BLACKBOX_DEMO_PROFILE_1_PHONE`
-- `BLACKBOX_DEMO_PROFILE_2_PHONE`
-- `BLACKBOX_DEMO_PROFILE_3_PHONE`
-- `BLACKBOX_DEMO_PROFILE_4_PHONE`
+- `BLACKBOX_DEMO_PROFILE_1_PHONE` (Johnathan)
+- `BLACKBOX_DEMO_PROFILE_2_PHONE` (Keith)
+- `BLACKBOX_DEMO_PROFILE_3_PHONE` (Maria)
+- `BLACKBOX_DEMO_PROFILE_4_PHONE` (Terry)
+
+Or set all four at once: `BLACKBOX_DEMO_PRESENTERS=+1...,+1...,+1...,+1...`
 
 Emergency contact defaults to `+16124331186`.
+
+#### Keith (Deaf/ASL) — modality rules
+
+- TRIBE will **never** initiate a voice call to Keith.
+- On disaster dispatch, Keith receives **SMS instructions** (safety check link, shelter info).
+- If escalation is needed, the dispatcher case recommends a **live ASL video call**.
+- The TRIBE harness, critiques, and recommended actions all enforce this.
+- The map pin for Keith shows modality as `asl_video` so the dispatcher UI can surface the video-call option.
 
 ### TRIBE-V2 Harness
 

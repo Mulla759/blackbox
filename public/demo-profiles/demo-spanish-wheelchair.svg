@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Demo profile 3">
+  <rect width="120" height="120" rx="16" fill="#1a3d2e"/>
+  <circle cx="60" cy="48" r="22" fill="#d4a574"/>
+  <ellipse cx="60" cy="88" rx="28" ry="18" fill="#2e6b4f"/>
+  <text x="60" y="56" text-anchor="middle" fill="#1a3d2e" font-family="system-ui,sans-serif" font-size="18" font-weight="700">3</text>
+</svg>

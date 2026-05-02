@@ -81,7 +81,7 @@ function nextLiveUtterance(profile: PersonProfile, tokenState: TribeTokenState, 
   }
 
   if (disability.includes("deaf") || disability.includes("asl")) {
-    return "I can continue by text or send an ASL video link. Are you safe where you are right now?";
+    return "This person is Deaf. Do not voice-call. Send SMS check-in and offer ASL video link. Dispatcher: initiate live video call if escalation is needed.";
   }
 
   if (language.includes("spanish")) {
@@ -97,9 +97,13 @@ function nextLiveUtterance(profile: PersonProfile, tokenState: TribeTokenState, 
 
 function recommendedAction(score: TribeScore, profile: PersonProfile, tokenState: TribeTokenState): string {
   const disability = (profile.disability ?? "").toLowerCase();
+  const isDeaf = disability.includes("deaf") || disability.includes("asl") || profile.communication_preferences?.modality === "asl_video";
+  if (score.band === "CRITICAL" && isDeaf) return "NEVER voice-call. Send urgent SMS with safety check link. Dispatcher: initiate live ASL video call immediately. Contact emergency contact.";
   if (score.band === "CRITICAL" && disability.includes("oxygen")) return "Dispatch portable oxygen or power support and call emergency contact.";
   if (score.band === "CRITICAL" && disability.includes("dialysis")) return "Escalate medical continuity check and confirm medication refrigeration.";
   if (score.band === "CRITICAL") return "Open dispatcher case, keep caller engaged, and contact emergency support.";
+  if (isDeaf && score.band === "ELEVATED") return "Send SMS follow-up with status check. Offer ASL video call link. Do not voice-call.";
+  if (isDeaf) return "Send SMS check-in. Note: voice calls are not accessible for this person. Use SMS or ASL video.";
   if (score.band === "ELEVATED" && tokenState.no_response) return "Retry contact by alternate modality and notify emergency contact.";
   if (score.band === "ELEVATED") return "Queue dispatcher review and send targeted follow-up.";
   if (score.band === "WATCH") return "Continue monitoring and schedule follow-up.";
@@ -126,7 +130,7 @@ function buildCritiques(profile: PersonProfile, tokenState: TribeTokenState, sco
       name: "modality",
       finding:
         disability.includes("deaf") || profile.communication_preferences?.modality === "asl_video"
-          ? "Voice-only communication is not sufficient; prefer SMS or ASL link."
+          ? "NEVER voice-call this person. Use SMS for check-ins and instructions. Dispatcher can initiate live ASL video call for escalation. Voice-only communication will fail."
           : `Preferred language is ${preferredLanguage(profile)}. ${openingRegister(profile)}`,
       severity_delta: disability.includes("deaf") ? 5 : 0,
     },
@@ -196,7 +200,10 @@ export async function evaluateLive(params: {
 }): Promise<LiveDecision> {
   const profile = resolveProfile({ household_id: params.household_id });
   const disasterContext = params.disaster_id ? buildDashboardData(params.disaster_id) : null;
-  const tokenState = tokenizeSignal(`${params.full_transcript}\n${params.latest_turn}`);
+  const textToTokenize = params.full_transcript.includes(params.latest_turn)
+    ? params.full_transcript
+    : `${params.full_transcript}\n${params.latest_turn}`;
+  const tokenState = tokenizeSignal(textToTokenize);
   const score = scorePersonaRisk({ tokenState, profile, disasterContext });
   const escalateNow = score.hard_threshold || score.band === "CRITICAL";
   const dispatcherCase = escalateNow

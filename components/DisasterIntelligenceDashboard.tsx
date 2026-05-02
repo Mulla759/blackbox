@@ -1,6 +1,7 @@
 "use client";
 
 import type { DisasterDashboardData } from "@/lib/disaster-intel";
+import type { DispatcherCase } from "@/lib/tribe-v2/types";
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
@@ -24,6 +25,19 @@ function formatN(n: number): string {
   return new Intl.NumberFormat("en-US").format(n);
 }
 
+function severityBadgeClass(sev: string): string {
+  switch (sev) {
+    case "CRITICAL":
+      return "bg-[var(--state-critical)] text-white";
+    case "ELEVATED":
+      return "bg-orange-500 text-white";
+    case "WATCH":
+      return "bg-amber-400 text-black";
+    default:
+      return "bg-emerald-700 text-white";
+  }
+}
+
 export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props) {
   const [data, setData] = useState(initialData);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
@@ -32,10 +46,37 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [dispatcherCases, setDispatcherCases] = useState<DispatcherCase[]>([]);
+  const [mapReady, setMapReady] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const caseMarkersRef = useRef<google.maps.Marker[]>([]);
   const dataRef = useRef(data);
-  dataRef.current = data;
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    let alive = true;
+    let t: ReturnType<typeof setTimeout>;
+    async function pollCases() {
+      try {
+        const res = await fetch("/api/tribe-v2/dispatcher-cases", { cache: "no-store" });
+        const j = (await res.json()) as { cases?: DispatcherCase[] };
+        if (alive) setDispatcherCases(j.cases ?? []);
+      } catch {
+        /* ignore transient demo errors */
+      }
+      if (alive) t = setTimeout(pollCases, 4000);
+    }
+    void pollCases();
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, []);
 
   useEffect(() => {
     const key = mapsApiKey?.trim();
@@ -60,6 +101,8 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
         mapTypeControl: false,
         streetViewControl: false,
       });
+      mapRef.current = map;
+      setMapReady(true);
 
       const info = new g.maps.InfoWindow();
 
@@ -85,7 +128,7 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
           map,
           position: { lat: s.latitude, lng: s.longitude },
           title: s.name,
-          icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+          icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
         });
         marker.addListener("click", () => {
           info.setContent(
@@ -103,7 +146,7 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
           map,
           position: { lat: h.latitude, lng: h.longitude },
           title: h.reason,
-          icon: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
+          icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
         });
         marker.addListener("click", () => {
           info.setContent(
@@ -132,6 +175,8 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
       mountMap();
       return () => {
         cancelled = true;
+        setMapReady(false);
+        mapRef.current = null;
         if (mapContainerRef.current) mapContainerRef.current.innerHTML = "";
       };
     }
@@ -148,6 +193,8 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
       }
       return () => {
         cancelled = true;
+        setMapReady(false);
+        mapRef.current = null;
         existing.removeEventListener("load", onLoad);
         if (mapContainerRef.current) mapContainerRef.current.innerHTML = "";
       };
@@ -169,9 +216,49 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
 
     return () => {
       cancelled = true;
+      setMapReady(false);
+      mapRef.current = null;
       if (mapContainerRef.current) mapContainerRef.current.innerHTML = "";
     };
   }, [mapsApiKey]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const g = typeof window !== "undefined" ? window.google : undefined;
+    if (!mapReady || !map || !g?.maps) return;
+
+    for (const m of caseMarkersRef.current) {
+      m.setMap(null);
+    }
+    caseMarkersRef.current = [];
+
+    const info = new g.maps.InfoWindow();
+
+    for (const c of dispatcherCases) {
+      const lat = c.location.latitude;
+      const lng = c.location.longitude;
+      if (typeof lat !== "number" || typeof lng !== "number") continue;
+
+      const marker = new g.maps.Marker({
+        map,
+        position: { lat, lng },
+        title: c.profile.label ?? c.household_id,
+        icon: "http://maps.google.com/mapfiles/ms/icons/purple-dot.png",
+      });
+
+      const name = escapeHtml(c.profile.label ?? c.household_id);
+      const brief = escapeHtml(c.brief.length > 220 ? `${c.brief.slice(0, 220)}…` : c.brief);
+      marker.addListener("click", () => {
+        info.setContent(
+          `<div style="max-width:280px"><strong>${name}</strong><br/>` +
+            `<span style="font-size:11px">${escapeHtml(c.severity)} · ${escapeHtml(c.channel)}</span><br/>${brief}</div>`
+        );
+        info.open({ map, anchor: marker });
+      });
+
+      caseMarkersRef.current.push(marker);
+    }
+  }, [dispatcherCases, mapReady]);
 
   async function runEstimate() {
     setLoadingEstimate(true);
@@ -320,6 +407,60 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
             </div>
           ) : null}
         </div>
+
+        <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-xl font-extrabold">Live check-ins (TRIBE)</h2>
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Purple pins · polls every 4s
+            </p>
+          </div>
+          <p className="mt-1 text-sm text-foreground/70">
+            After voice or SMS replies, cases appear here with registry avatars. Run{" "}
+            <span className="font-mono text-xs">POST /api/demo/kickoff-drill</span> for the full SMS → call
+            flow.
+          </p>
+          {dispatcherCases.length === 0 ? (
+            <p className="mt-3 text-sm text-foreground/55">No dispatcher cases yet — complete a check-in to populate.</p>
+          ) : (
+            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+              {dispatcherCases.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex gap-3 rounded-lg border border-border/80 bg-background p-3 text-sm"
+                >
+                  {c.profile.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.profile.avatar_url}
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="h-14 w-14 shrink-0 rounded-lg border border-border object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted font-mono text-xs">
+                      {c.household_id.slice(0, 2)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold leading-tight">{c.profile.label ?? c.household_id}</p>
+                    <p className="mt-1 font-mono text-[10px] text-foreground/60">{c.profile.phone_number}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <span className={`px-2 py-0.5 font-mono text-[10px] font-bold ${severityBadgeClass(c.severity)}`}>
+                        {c.severity}
+                      </span>
+                      <span className="border border-border px-2 py-0.5 font-mono text-[10px]">{c.channel}</span>
+                      <span className="border border-border px-2 py-0.5 font-mono text-[10px]">{c.status}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-foreground/80">{c.brief}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">{c.latest_transcript}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
 
         <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="font-display text-xl font-extrabold">Hotspots</h2>
