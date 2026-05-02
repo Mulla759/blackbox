@@ -231,8 +231,8 @@ export async function estimate_accessibility_impact(
     place.county && place.stateAbbr
       ? await fetchCountyProfile(place.county, place.stateAbbr, fetchFn).catch(() => null)
       : null;
-  const placesRates = countyProfile
-    ? await fetchCdcPlacesRates(countyProfile, fetchFn).catch(() => ({}))
+  const placesRates: PlacesRates = countyProfile
+    ? await fetchCdcPlacesRates(countyProfile, fetchFn).catch((): PlacesRates => ({}))
     : {};
   const femaRecentCount =
     place.county && place.stateAbbr

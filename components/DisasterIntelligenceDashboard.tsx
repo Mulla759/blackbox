@@ -242,9 +242,9 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
   }
 
   return (
-    <div className="mx-auto grid max-w-[1450px] gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[1.25fr_1fr]">
-      <section className="space-y-4">
-        <article className="border border-border bg-card p-5">
+    <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 py-5 sm:gap-5 sm:px-6 lg:grid-cols-12">
+      <section className="min-w-0 space-y-4 lg:col-span-7 xl:col-span-8">
+        <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h1 className="font-display text-2xl font-extrabold">{data.disaster.title}</h1>
           <div className="mt-2 flex flex-wrap gap-2">
             <span className="bg-[var(--state-critical)] px-2 py-1 font-mono text-xs font-bold text-white">
@@ -261,7 +261,7 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
           <p className="mt-2 text-sm text-foreground/90">{data.disaster.description}</p>
         </article>
 
-        <article className="border border-border bg-card p-5">
+        <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <p className="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
             Accessibility impact estimate
           </p>
@@ -300,7 +300,7 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
           {estimateError ? <p className="mt-2 text-sm text-[var(--state-critical)]">{estimateError}</p> : null}
         </article>
 
-        <div className="relative h-[380px] w-full border border-border bg-card">
+        <div className="relative h-[360px] w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm sm:h-[420px]">
           <div ref={mapContainerRef} className="h-full w-full min-h-[200px]" />
           {!mapsApiKey.trim() ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/95 px-4 text-center text-sm text-muted-foreground">
@@ -321,11 +321,11 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
           ) : null}
         </div>
 
-        <article className="border border-border bg-card p-5">
+        <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="font-display text-xl font-extrabold">Hotspots</h2>
           <div className="mt-3 grid gap-3">
             {data.hotspots.map((h) => (
-              <div key={h.id} className="border border-border/80 bg-background p-3 text-sm">
+              <div key={h.id} className="break-words rounded-lg border border-border/80 bg-background p-3 text-sm">
                 <p className="font-mono text-xs font-bold">{h.risk_level}</p>
                 <p className="mt-1">{h.reason}</p>
                 <p className="mt-1 text-foreground/80">Estimated people affected: {formatN(h.estimated_people_affected)}</p>
@@ -336,12 +336,12 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
         </article>
       </section>
 
-      <aside className="space-y-4">
-        <article className="border border-border bg-card p-5">
+      <aside className="min-w-0 space-y-4 lg:col-span-5 xl:col-span-4">
+        <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="font-display text-xl font-extrabold">Shelters</h2>
           <div className="mt-3 grid gap-3">
             {data.shelters.map((s) => (
-              <div key={s.id} className="border border-border/80 bg-background p-3 text-sm">
+              <div key={s.id} className="break-words rounded-lg border border-border/80 bg-background p-3 text-sm">
                 <p className="font-semibold">{s.name}</p>
                 <p className="text-foreground/75">
                   {s.address}, {s.city}, {s.state}
@@ -361,22 +361,22 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
           </div>
         </article>
 
-        <article className="border border-border bg-card p-5">
+        <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="font-display text-xl font-extrabold">Gemini AI Chatbot</h2>
           <p className="mt-1 text-sm text-foreground/70">
             Aggregate intelligence only. No private personal data is exposed.
           </p>
-          <div className="mt-3 h-64 overflow-y-auto border border-border bg-background p-3 text-sm">
+          <div className="mt-3 h-64 overflow-y-auto rounded-lg border border-border bg-background p-3 text-sm">
             {chat.length === 0 ? (
               <p className="text-foreground/60">Ask about priorities, hotspots, shelters, and accessibility estimates.</p>
             ) : null}
             {chat.map((row, i) => (
-              <p key={`${row.role}-${i}`} className="mb-2">
+              <p key={`${row.role}-${i}`} className="mb-2 whitespace-pre-wrap break-words">
                 <strong>{row.role === "user" ? "You" : "BlackBox AI"}:</strong> {row.text}
               </p>
             ))}
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex items-stretch gap-2">
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
@@ -387,7 +387,7 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
               type="button"
               disabled={chatBusy}
               onClick={() => void sendChat(chatInput)}
-              className="border border-border px-3 py-2 font-mono text-xs uppercase"
+              className="shrink-0 border border-border px-3 py-2 font-mono text-xs uppercase"
             >
               {chatBusy ? "..." : "Send"}
             </button>
@@ -398,7 +398,7 @@ export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props
                 key={p}
                 type="button"
                 onClick={() => void sendChat(p)}
-                className="border border-border px-2 py-1 text-xs text-foreground/80"
+                className="max-w-full truncate rounded border border-border px-2 py-1 text-xs text-foreground/80"
               >
                 {p}
               </button>
