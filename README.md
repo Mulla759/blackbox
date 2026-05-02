@@ -23,8 +23,6 @@ Every at-risk household gets a dedicated AI agent that:
 
 ## Architecture
 
-![System diagram](docs/system-diagram.jpg)
-
 A disaster trigger spawns one persona-aware agent per household. Each agent reads the person's profile, picks a modality, and contacts them through the Modality Router. Raw signals flow into the **TRIBE Harness** — the final triage stage that decides whether to schedule a follow-up or escalate to a dispatcher.
 
 **Flow:** Disaster Trigger → Orchestrator → Per-Household Agents → Modality Router → **TRIBE Harness** (last) → Dispatcher Console
@@ -49,7 +47,7 @@ A disaster trigger spawns one persona-aware agent per household. Each agent read
 
 ## Getting Started
 
-See [`CONTRIBUTOR.md`](./CONTRIBUTOR.md) for setup, repo layout, and how to add personas, modalities, or critics.
+See [`Contributor.md`](./Contributor.md) for setup, repo layout, and how to add personas, modalities, or critics.
 
 ## Team
 
