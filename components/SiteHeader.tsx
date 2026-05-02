@@ -1,28 +1,57 @@
 import Link from "next/link";
 
-export function SiteHeader({
-  context,
-}: {
-  context?: string;
-}) {
+export function SiteHeader() {
   return (
-    <header className="border-b hairline">
-      <div className="mx-auto max-w-[1400px] px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-baseline gap-3">
-          <span className="font-display text-lg font-extrabold tracking-tight">
-            LIFELINE
+    <header className="sticky top-0 z-50 border-b border-border/90 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
+      <div className="mx-auto flex h-[3.25rem] max-w-[1400px] items-center gap-6 px-4 sm:h-14 sm:px-6">
+        <Link
+          href="/"
+          className="group flex min-w-0 shrink-0 items-center gap-2.5 rounded-sm focus-visible:outline-offset-4"
+        >
+          <span className="font-display text-[1.05rem] font-extrabold tracking-tight sm:text-lg">
+            BLACKBOX
           </span>
-          {context ? (
-            <span className="text-eyebrow">{context}</span>
-          ) : null}
+          <span
+            className="hidden h-2 w-2 shrink-0 bg-accent shadow-[0_0_0_1px_var(--border)] transition-[box-shadow] group-hover:shadow-[0_0_14px_color-mix(in_oklab,var(--accent)_55%,transparent)] sm:block"
+            aria-hidden
+          />
         </Link>
-        <nav className="flex items-center gap-6 text-eyebrow">
-          <Link href="/me" className="hover:text-foreground">
-            Individual
+
+        <div className="hidden h-7 w-px shrink-0 bg-border sm:block" aria-hidden />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted-foreground">
+            Disaster alerts · NWS feed
+          </p>
+        </div>
+
+        <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Link
+            href="/"
+            className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
+          >
+            Live
           </Link>
-          <Link href="/dispatcher" className="hover:text-foreground">
-            Dispatcher
+          <Link
+            href="/analytics"
+            className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
+          >
+            Analytics
           </Link>
+          <Link
+            href="/wellness"
+            className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
+          >
+            SMS check
+          </Link>
+          <a
+            href="/api/alerts"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-sm border border-border bg-card px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/85 transition-colors hover:border-accent hover:text-accent"
+          >
+            API
+          </a>
         </nav>
       </div>
     </header>

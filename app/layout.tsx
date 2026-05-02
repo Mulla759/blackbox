@@ -15,9 +15,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lifeline — disaster response that reaches everyone",
+  title: "BLACKBOX — disaster detection",
   description:
-    "An agentic disaster-response system that gives every at-risk household a dedicated AI agent. Built for AIIS Hackathon.",
+    "Disaster detection layer: normalized National Weather Service active alerts for emergency response systems.",
 };
 
 export default function RootLayout({
