@@ -39,6 +39,8 @@ export function DispatcherCommunications() {
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("");
   const [accessNeed, setAccessNeed] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showIntake, setShowIntake] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [smsBody, setSmsBody] = useState("");
@@ -168,75 +170,159 @@ export function DispatcherCommunications() {
   }
 
   return (
-    <div className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-4 py-6 lg:grid-cols-12">
-      <section className="space-y-4 lg:col-span-4">
+    <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 px-4 py-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <section className="space-y-4">
         <article className="rounded-xl border border-border bg-card p-4">
-          <h2 className="font-display text-lg font-extrabold">Contact Search</h2>
-          <div className="mt-3 space-y-2">
-            <input className="w-full border border-border bg-background px-3 py-2 text-sm" placeholder="Search name/phone/city/address" value={query} onChange={(e) => setQuery(e.target.value)} />
-            <input className="w-full border border-border bg-background px-3 py-2 text-sm" placeholder="Language (English/Spanish/Somali)" value={language} onChange={(e) => setLanguage(e.target.value)} />
-            <input className="w-full border border-border bg-background px-3 py-2 text-sm" placeholder="Accessibility need filter" value={accessNeed} onChange={(e) => setAccessNeed(e.target.value)} />
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-extrabold">Contacts</h2>
+            <button
+              type="button"
+              onClick={() => setShowIntake((v) => !v)}
+              className="border border-border px-2 py-1 font-mono text-[0.62rem] uppercase tracking-[0.12em]"
+            >
+              {showIntake ? "Close intake" : "New contact"}
+            </button>
+          </div>
+          <input
+            className="mt-3 w-full border border-border bg-background px-3 py-2 text-sm"
+            placeholder="Search by name, phone, city, or address"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {showFilters ? "Hide filters" : "Show language/accessibility filters"}
+          </button>
+          {showFilters ? (
+            <div className="mt-2 grid grid-cols-1 gap-2">
+              <input
+                className="w-full border border-border bg-background px-3 py-2 text-sm"
+                placeholder="Language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              />
+              <input
+                className="w-full border border-border bg-background px-3 py-2 text-sm"
+                placeholder="Accessibility need"
+                value={accessNeed}
+                onChange={(e) => setAccessNeed(e.target.value)}
+              />
+            </div>
+          ) : null}
+
+          <div className="mt-3 max-h-[520px] overflow-auto space-y-2 pr-1">
+            {contacts.length === 0 ? (
+              <p className="rounded border border-border bg-background p-3 text-sm text-muted-foreground">
+                No contacts match your filters.
+              </p>
+            ) : (
+              contacts.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedId(c.id)}
+                  className={`w-full rounded border p-3 text-left text-sm ${selectedId === c.id ? "border-accent bg-accent/10" : "border-border bg-background"}`}
+                >
+                  <p className="font-semibold">{c.full_name ?? "Unknown contact"}</p>
+                  <p className="font-mono text-xs">{c.phone_number}</p>
+                  <p className="text-xs text-foreground/70">
+                    {c.preferred_language ?? "Unknown language"} ·{" "}
+                    {c.prefers_sms ? "SMS" : c.prefers_voice ? "Voice" : "No preference"}
+                  </p>
+                  {c.is_deaf_or_hard_of_hearing ? (
+                    <p className="mt-1 text-xs text-[var(--state-critical)]">SMS recommended</p>
+                  ) : null}
+                </button>
+              ))
+            )}
           </div>
         </article>
 
-        <article className="rounded-xl border border-border bg-card p-4">
-          <h2 className="font-display text-lg font-extrabold">Contact List</h2>
-          <div className="mt-3 max-h-[520px] overflow-auto space-y-2 pr-1">
-            {contacts.map((c) => (
+        {showIntake ? (
+          <article className="rounded-xl border border-border bg-card p-4">
+            <h2 className="font-display text-base font-extrabold">New Contact Intake</h2>
+            <form onSubmit={submitIntake} className="mt-3 grid grid-cols-1 gap-2">
+              {[
+                ["full_name", "Full name"],
+                ["phone_number", "Phone number"],
+                ["address", "Address"],
+                ["city", "City"],
+                ["state", "State"],
+                ["zip_code", "Zip code"],
+                ["preferred_language", "Preferred language"],
+                ["accessibility_needs", "Accessibility needs"],
+                ["emergency_contact_name", "Emergency contact name"],
+                ["emergency_contact_phone", "Emergency contact phone"],
+                ["interpreter_language", "Interpreter language (optional)"],
+              ].map(([k, label]) => (
+                <input
+                  key={k}
+                  className="w-full border border-border bg-background px-3 py-2 text-sm"
+                  placeholder={label}
+                  value={form[k as keyof typeof form] as string}
+                  onChange={(e) => setForm((prev) => ({ ...prev, [k]: e.target.value }))}
+                />
+              ))}
+              <textarea
+                className="w-full border border-border bg-background px-3 py-2 text-sm"
+                placeholder="Notes"
+                value={form.notes}
+                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              />
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.is_deaf_or_hard_of_hearing}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, is_deaf_or_hard_of_hearing: e.target.checked }))
+                    }
+                  />
+                  Deaf/hard of hearing
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.requires_interpreter}
+                    onChange={(e) => setForm((prev) => ({ ...prev, requires_interpreter: e.target.checked }))}
+                  />
+                  Requires interpreter
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.prefers_sms}
+                    onChange={(e) => setForm((prev) => ({ ...prev, prefers_sms: e.target.checked }))}
+                  />
+                  Prefers SMS
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.prefers_voice}
+                    onChange={(e) => setForm((prev) => ({ ...prev, prefers_voice: e.target.checked }))}
+                  />
+                  Prefers voice
+                </label>
+              </div>
               <button
-                key={c.id}
-                type="button"
-                onClick={() => setSelectedId(c.id)}
-                className={`w-full rounded border p-3 text-left text-sm ${selectedId === c.id ? "border-accent bg-accent/10" : "border-border bg-background"}`}
+                type="submit"
+                disabled={busy}
+                className="border border-border bg-background px-4 py-2 font-mono text-xs uppercase"
               >
-                <p className="font-semibold">{c.full_name ?? "Unknown contact"}</p>
-                <p className="font-mono text-xs">{c.phone_number}</p>
-                <p className="text-xs text-foreground/70">{c.preferred_language ?? "Unknown language"} · {c.prefers_sms ? "SMS" : c.prefers_voice ? "Voice" : "No preference"}</p>
-                {c.is_deaf_or_hard_of_hearing ? (
-                  <p className="mt-1 text-xs text-[var(--state-critical)]">Deaf/hard-of-hearing: SMS recommended</p>
-                ) : null}
+                {busy ? "Saving..." : "Save contact"}
               </button>
-            ))}
-          </div>
-        </article>
+            </form>
+          </article>
+        ) : null}
       </section>
 
-      <section className="space-y-4 lg:col-span-8">
+      <section className="space-y-4">
         <article className="rounded-xl border border-border bg-card p-4">
-          <h2 className="font-display text-lg font-extrabold">New Contact Intake Form</h2>
-          <form onSubmit={submitIntake} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {[
-              ["full_name", "Full name"],
-              ["phone_number", "Phone number"],
-              ["address", "Address"],
-              ["city", "City"],
-              ["state", "State"],
-              ["zip_code", "Zip"],
-              ["preferred_language", "Preferred language"],
-              ["accessibility_needs", "Accessibility needs"],
-              ["emergency_contact_name", "Emergency contact name"],
-              ["emergency_contact_phone", "Emergency contact phone"],
-              ["interpreter_language", "Interpreter language (optional)"],
-            ].map(([k, label]) => (
-              <input
-                key={k}
-                className="w-full border border-border bg-background px-3 py-2 text-sm"
-                placeholder={label}
-                value={form[k as keyof typeof form] as string}
-                onChange={(e) => setForm((prev) => ({ ...prev, [k]: e.target.value }))}
-              />
-            ))}
-            <textarea className="sm:col-span-2 w-full border border-border bg-background px-3 py-2 text-sm" placeholder="Notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.is_deaf_or_hard_of_hearing} onChange={(e) => setForm((prev) => ({ ...prev, is_deaf_or_hard_of_hearing: e.target.checked }))} /> Deaf / hard of hearing</label>
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.requires_interpreter} onChange={(e) => setForm((prev) => ({ ...prev, requires_interpreter: e.target.checked }))} /> Requires interpreter</label>
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.prefers_sms} onChange={(e) => setForm((prev) => ({ ...prev, prefers_sms: e.target.checked }))} /> Prefers SMS</label>
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.prefers_voice} onChange={(e) => setForm((prev) => ({ ...prev, prefers_voice: e.target.checked }))} /> Prefers voice</label>
-            <button type="submit" disabled={busy} className="sm:col-span-2 border border-border bg-background px-4 py-2 font-mono text-xs uppercase">{busy ? "Saving..." : "Save contact"}</button>
-          </form>
-        </article>
-
-        <article className="rounded-xl border border-border bg-card p-4">
-          <h2 className="font-display text-lg font-extrabold">Contact Detail Panel</h2>
+          <h2 className="font-display text-lg font-extrabold">Contact Detail & Actions</h2>
           {!selected ? (
             <p className="mt-2 text-sm text-muted-foreground">Select a contact to view details and communicate.</p>
           ) : (
