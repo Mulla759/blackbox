@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordInboundSms } from "@/lib/communications/inbound";
+import { evaluateSignal } from "@/lib/tribe-v2";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,13 @@ export async function POST(req: Request) {
       typeof json.disaster_event_name === "string" ? json.disaster_event_name : undefined,
     provider: "simulated",
   });
+  const packet = await evaluateSignal({
+    phone_number,
+    channel: "sms",
+    transcript: body,
+    disaster_id: recorded.disaster_event_id,
+    disaster_name: recorded.disaster_event_name,
+  });
 
-  return NextResponse.json({ ok: true, response: recorded });
+  return NextResponse.json({ ok: true, response: recorded, tribe_v2: packet });
 }

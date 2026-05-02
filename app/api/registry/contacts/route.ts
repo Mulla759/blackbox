@@ -12,7 +12,21 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { phone_number?: string; label?: string; location?: string };
+  let body: {
+    phone_number?: string;
+    label?: string;
+    location?: string;
+    age?: number;
+    disability?: string;
+    preferred_language?: string;
+    emergency_contact_phone?: string;
+    latitude?: number;
+    longitude?: number;
+    communication_preferences?: {
+      modality?: "sms" | "voice" | "both" | "asl_video";
+      cadence?: "standard" | "slow" | "urgent";
+    };
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -38,6 +52,17 @@ export async function POST(req: Request) {
     phone_number: phone,
     location,
     ...(label ? { label } : {}),
+    ...(typeof body.age === "number" ? { age: body.age } : {}),
+    ...(typeof body.disability === "string" ? { disability: body.disability } : {}),
+    ...(typeof body.preferred_language === "string"
+      ? { preferred_language: body.preferred_language }
+      : {}),
+    ...(typeof body.emergency_contact_phone === "string"
+      ? { emergency_contact_phone: body.emergency_contact_phone }
+      : {}),
+    ...(typeof body.latitude === "number" ? { latitude: body.latitude } : {}),
+    ...(typeof body.longitude === "number" ? { longitude: body.longitude } : {}),
+    ...(body.communication_preferences ? { communication_preferences: body.communication_preferences } : {}),
   });
 
   return NextResponse.json({ contact });

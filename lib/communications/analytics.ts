@@ -2,6 +2,8 @@ import { extractAreaCode } from "./phone";
 import { getSmsProvider } from "./resolve-sms-provider";
 import { exportCommunicationSnapshot } from "./store";
 import type { CommunicationLogRecord, SafetyCheckResponse } from "./types";
+import { listDispatcherCases } from "@/lib/tribe-v2";
+import type { DispatcherCase } from "@/lib/tribe-v2";
 
 export type CommunicationAnalytics = {
   provider: string;
@@ -20,6 +22,7 @@ export type CommunicationAnalytics = {
   area_code_counts: Record<string, number>;
   recent_logs: CommunicationLogRecord[];
   responses: SafetyCheckResponse[];
+  dispatcher_cases: DispatcherCase[];
 };
 
 export function buildCommunicationAnalytics(): CommunicationAnalytics {
@@ -84,5 +87,6 @@ export function buildCommunicationAnalytics(): CommunicationAnalytics {
     area_code_counts,
     recent_logs: logs.slice(0, 300),
     responses: responses.slice(0, 500),
+    dispatcher_cases: listDispatcherCases(),
   };
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordInboundSms } from "@/lib/communications/inbound";
+import { evaluateSignal } from "@/lib/tribe-v2";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing From or Body" }, { status: 400 });
   }
 
-  recordInboundSms({
+  const recorded = recordInboundSms({
     phone_number: From,
     raw_body: Body,
     provider: "twilio",
     provider_message_id: typeof MessageSid === "string" ? MessageSid : undefined,
+  });
+
+  await evaluateSignal({
+    phone_number: From,
+    channel: "sms",
+    transcript: Body,
+    disaster_id: recorded.disaster_event_id,
+    disaster_name: recorded.disaster_event_name,
   });
 
   return new NextResponse(null, { status: 204 });

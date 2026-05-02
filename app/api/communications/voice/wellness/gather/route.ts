@@ -3,6 +3,7 @@ import { appendCommunicationLog, appendSafetyResponse } from "@/lib/communicatio
 import { normalizePhoneNumber } from "@/lib/communications/phone";
 import { getPublicAppBaseUrl } from "@/lib/communications/public-app-url";
 import { getActiveDisasterTypesForState } from "@/lib/disaster";
+import { evaluateSignal } from "@/lib/tribe-v2";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,31 @@ function finalStatusMessage(responseType: "safe" | "needs_help" | "emergency" | 
   if (responseType === "safe") return "Thank you. We recorded that you are currently safe.";
   if (responseType === "emergency") return "Emergency recorded. We are escalating immediately.";
   return "Thank you for checking in with Blackbox.";
+}
+
+async function evaluateVoiceCheckpoint(params: {
+  phone: string;
+  responseType: "safe" | "needs_help" | "emergency" | "unknown";
+  eventId: string;
+  eventName: string;
+  raw: string;
+  suffix?: string;
+}) {
+  const statusText =
+    params.responseType === "needs_help"
+      ? "needs help"
+      : params.responseType === "emergency"
+        ? "emergency"
+        : params.responseType === "safe"
+          ? "safe"
+          : "unknown";
+  await evaluateSignal({
+    phone_number: params.phone,
+    channel: "voice",
+    transcript: `Voice check-in response: ${statusText}. ${params.suffix ?? ""} Raw input: ${params.raw}`,
+    disaster_id: params.eventId,
+    disaster_name: params.eventName,
+  });
 }
 
 const KEYPAD_GROUPS: Record<string, string> = {
@@ -107,6 +133,14 @@ export async function POST(req: Request) {
         disaster_event_id: eventId,
         disaster_event_name: eventName,
         raw_message: raw,
+      });
+
+      await evaluateVoiceCheckpoint({
+        phone,
+        responseType,
+        eventId,
+        eventName,
+        raw,
       });
 
       if (responseType === "unknown") {
@@ -272,6 +306,15 @@ export async function POST(req: Request) {
         delivery_status: "delivered",
         disaster_event_id: eventId,
         disaster_event_name: selected,
+      });
+
+      await evaluateVoiceCheckpoint({
+        phone,
+        responseType,
+        eventId,
+        eventName: selected,
+        raw,
+        suffix: `Caller selected active disaster type: ${selected}.`,
       });
 
       twiml.say({ voice: "alice" }, `You selected ${selected}.`);
