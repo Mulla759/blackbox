@@ -13,7 +13,7 @@ export function buildWellnessCheckBody(): string {
 }
 
 export function buildWellnessCallPrompt(): string {
-  return "Hello, this is Blackbox emergency check-in. We are calling to check your safety status. Please reply to our text message with YES if you need help, or NO if you are okay.";
+  return "Hello, this is Blackbox emergency check-in. Press 1 if you need help now, press 2 if you are okay, or press 3 for emergency.";
 }
 
 /**

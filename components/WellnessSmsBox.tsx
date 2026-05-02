@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type ThreadMsg = {
   id: string;
   timestamp: string;
-  channel: "sms" | "voice";
+  channel: "voice";
   direction: "outbound" | "inbound";
   body: string;
   delivery_status?: string;
@@ -15,7 +15,6 @@ const POLL_MS = 2500;
 
 export function WellnessSmsBox() {
   const [phone, setPhone] = useState("");
-  const [mode, setMode] = useState<"sms" | "call" | "both">("both");
   const [messages, setMessages] = useState<ThreadMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -68,12 +67,11 @@ export function WellnessSmsBox() {
       const res = await fetch("/api/wellness-check/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: trimmed, mode }),
+        body: JSON.stringify({ phone_number: trimmed }),
       });
       const data = (await res.json()) as {
         error?: string;
         phone_number?: string;
-        mode?: "sms" | "call" | "both";
         provider?: string;
         delivery_status?: string;
       };
@@ -83,15 +81,15 @@ export function WellnessSmsBox() {
         return;
       }
 
-      if (data.provider === "simulated" && mode !== "call") {
+      if (data.provider === "simulated") {
         setSendError(
-          "Simulated SMS only (no carrier). Add Twilio vars in .env and restart dev."
+          "Call is in placeholder mode. Add Twilio voice vars in .env and restart dev."
         );
         return;
       }
 
       if (data.delivery_status === "failed") {
-        setSendError(data.error ?? "SMS failed to send.");
+        setSendError(data.error ?? "Call failed to start.");
         return;
       }
 
@@ -104,14 +102,14 @@ export function WellnessSmsBox() {
 
   return (
     <div className="mx-auto max-w-lg px-6 py-10">
-      {/* Virtual SMS thread */}
+      {/* Virtual call/reply thread */}
       <div
         ref={listRef}
         className="mb-8 flex max-h-[min(50vh,420px)] flex-col gap-3 overflow-y-auto border border-border bg-card/40 p-4"
       >
         {messages.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            Sent and received messages for this number will show here.
+            Call events and keypad/speech replies for this number will show here.
           </p>
         ) : (
           messages.map((m) => {
@@ -154,21 +152,12 @@ export function WellnessSmsBox() {
           onChange={(e) => setPhone(e.target.value)}
           className="border border-border bg-card px-4 py-3 font-mono text-base text-foreground placeholder:text-muted-foreground/50 focus-visible:border-accent"
         />
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as "sms" | "call" | "both")}
-          className="border border-border bg-card px-3 py-2 font-mono text-xs uppercase tracking-[0.12em]"
-        >
-          <option value="sms">Text only</option>
-          <option value="call">Call only</option>
-          <option value="both">Call + text</option>
-        </select>
         <button
           type="submit"
           disabled={busy}
           className="border border-border bg-accent py-3 font-mono text-xs uppercase tracking-[0.18em] text-accent-foreground hover:opacity-90 disabled:opacity-40"
         >
-          {busy ? "Sending…" : "Send check-in"}
+          {busy ? "Calling…" : "Start call check-in"}
         </button>
       </form>
 

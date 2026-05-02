@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { isUsE164, normalizePhoneNumber } from "@/lib/communications/phone";
-import { sendWellnessCheckCall, sendWellnessCheckSms } from "@/lib/communications/wellness";
+import { sendWellnessCheckCall } from "@/lib/communications/wellness";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  let body: { phone_number?: string; mode?: "sms" | "call" | "both" };
+  let body: { phone_number?: string };
   try {
-    body = (await req.json()) as { phone_number?: string; mode?: "sms" | "call" | "both" };
+    body = (await req.json()) as { phone_number?: string };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -34,16 +34,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const mode = body.mode ?? "sms";
-  const smsResult =
-    mode === "call" ? null : await sendWellnessCheckSms(normalizedInput);
-  const callResult =
-    mode === "sms" ? null : await sendWellnessCheckCall(normalizedInput);
-
-  const result = callResult ?? smsResult;
-  if (!result) {
-    return NextResponse.json({ error: "No action selected" }, { status: 400 });
-  }
+  const result = await sendWellnessCheckCall(normalizedInput);
   const sent_at = new Date().toISOString();
   const normalized = normalizedInput;
 
@@ -51,25 +42,15 @@ export async function POST(req: Request) {
     ok: true,
     sent_at,
     phone_number: normalized,
-    mode,
-    sms: smsResult
-      ? {
-          provider: smsResult.provider,
-          status: smsResult.delivery_status,
-          sid: smsResult.provider_message_id ?? null,
-          error: smsResult.error ?? null,
-        }
-      : null,
-    call: callResult
-      ? {
-          provider: callResult.provider,
-          status: callResult.delivery_status,
-          sid: callResult.provider_message_id ?? null,
-          error: callResult.error ?? null,
-        }
-      : null,
+    mode: "call",
+    call: {
+      provider: result.provider,
+      status: result.delivery_status,
+      sid: result.provider_message_id ?? null,
+      error: result.error ?? null,
+    },
     provider: result.provider,
-    twilio_message_sid: result.provider_message_id ?? null,
+    twilio_call_sid: result.provider_message_id ?? null,
     delivery_status: result.delivery_status,
     error: result.error ?? null,
   });

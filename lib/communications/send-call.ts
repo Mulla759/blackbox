@@ -1,4 +1,5 @@
 import twilio from "twilio";
+import { getPublicAppBaseUrl } from "./public-app-url";
 import { normalizePhoneNumber } from "./phone";
 import { appendCommunicationLog } from "./store";
 import type { SendMessageResult } from "./types";
@@ -20,8 +21,7 @@ function twilioErrorMessage(err: unknown): string {
  * - TWILIO_ACCOUNT_SID
  * - TWILIO_AUTH_TOKEN
  * - TWILIO_VOICE_FROM_NUMBER or TWILIO_PHONE_NUMBER
- *
- * No webhook/public URL required in this mode: call content is inline TwiML only.
+ * - PUBLIC_APP_URL (or defaults to production URL)
  */
 export async function send_call(
   phone_number: string,
@@ -37,6 +37,7 @@ export async function send_call(
   const from =
     process.env["TWILIO_VOICE_FROM_NUMBER"]?.trim() ??
     process.env["TWILIO_PHONE_NUMBER"]?.trim();
+  const base = getPublicAppBaseUrl();
 
   if (!accountSid || !authToken || !from) {
     const log = appendCommunicationLog({
@@ -60,13 +61,28 @@ export async function send_call(
   }
 
   const client = twilio(accountSid, authToken);
+  const twimlUrl = new URL("/api/communications/voice/wellness", base);
+  twimlUrl.searchParams.set("phone", to);
+  twimlUrl.searchParams.set("prompt", message);
+  if (options?.disaster_event_id) {
+    twimlUrl.searchParams.set("event_id", options.disaster_event_id);
+  }
+  if (options?.disaster_event_name) {
+    twimlUrl.searchParams.set("event_name", options.disaster_event_name);
+  }
+
+  const statusUrl = new URL("/api/communications/voice/status", base);
+  statusUrl.searchParams.set("phone", to);
 
   try {
     const call = await client.calls.create({
       from,
       to,
-      // Inline TwiML means no public webhook URL is required.
-      twiml: `<Response><Say voice="alice">${message}</Say><Pause length="1"/><Say voice="alice">Please reply to our text message with YES if you need help, or NO if you are okay.</Say></Response>`,
+      url: twimlUrl.toString(),
+      method: "POST",
+      statusCallback: statusUrl.toString(),
+      statusCallbackMethod: "POST",
+      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
 
     const log = appendCommunicationLog({
