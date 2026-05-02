@@ -1,54 +1,60 @@
 # BLACKBOX
 
-## A Double Crisis and Disasters
+> Disaster response for the people the system forgets.
 
-### Introduction
+## The Double Crisis
 
-During an actual disaster, individuals with disabilities face two layers of risk:
+When disaster strikes, people with disabilities face two crises: the disaster itself, and the loss of the infrastructure that keeps them alive. Power dies and ventilators stop. Pharmacies collapse and medications run out. Alerts broadcast in formats the deaf and blind cannot receive. Evacuation routes were never built for wheelchairs.
 
-1. **Immediate danger from the disaster itself** — earthquakes, floods, fires, severe storms, and other catastrophic events that threaten everyone in the affected area.
-2. **The loss of access to critical life-sustaining infrastructure** — power outages disabling ventilators and motorized wheelchairs, destroyed pharmacies cutting off essential medications, collapsed communication networks silencing those who rely on assistive technology to call for help, and evacuation routes that were never designed for people with mobility, sensory, or cognitive impairments.
+First responders arrive without knowing who depends on oxygen, who cannot hear the siren, who needs help leaving the building. The most vulnerable become invisible at the moment they need the most support.
 
-For the general population, surviving a disaster is one crisis. For people with disabilities, it is always two.
+## What BLACKBOX Does
 
-Emergency response systems today are largely built for the average-bodied, average-abled person. Shelter intake forms don't ask about durable medical equipment needs. Evacuation alerts are broadcast in formats inaccessible to the deaf and blind. First responders lack real-time information about who in their zone depends on oxygen concentrators, insulin, or powered mobility devices. The result is that the most vulnerable members of a community become invisible at the exact moment they need the most support.
+Every at-risk household gets a dedicated AI agent that:
 
-### Problem Statement
+- **Reaches** the person in their actual modality — voice, ASL clip, low-literacy SMS, native language
+- **Assesses** their state through a structured conversation
+- **Escalates** to a human dispatcher only when they are no longer able to stay safe
+- **Stays** with them through recovery, watching for caregiver burnout, missed medications, and isolation drift
 
-There is a critical gap between disaster response systems and the needs of people with disabilities. First responders often arrive on scene with no knowledge of who requires specialized assistance, what equipment or medications are life-critical, or how to communicate with individuals who have sensory or cognitive impairments. Meanwhile, the individuals themselves may have no way to signal their needs once infrastructure fails.
+**Two users, one system:**
+- **First responders** get a triaged queue with prepared briefs and ranked actions instead of a flood of unknowns.
+- **Individuals** get someone who reaches out before they have to ask, in a way they can actually understand.
 
-### Project Vision
+## Architecture
 
-BLACKBOX aims to bridge this gap by building a tool that serves one or both sides of the crisis:
+![System diagram](docs/system-diagram.jpg)
 
-- **For first responders** — providing actionable, real-time intelligence about vulnerable individuals in an affected area: their locations, disability profiles, critical dependencies (medical equipment, medications, caregivers), and communication needs, so responders can prioritize and tailor their efforts.
-- **For individuals with disabilities** — providing a resilient, accessible interface to signal distress, communicate needs, and maintain connection to emergency services even when conventional infrastructure has failed.
+A disaster trigger spawns one persona-aware agent per household. Each agent reads the person's profile, picks a modality, and contacts them through the Modality Router. Raw signals flow into the **TRIBE Harness** — the final triage stage that decides whether to schedule a follow-up or escalate to a dispatcher.
 
-### Key Challenges We Are Solving
+**Flow:** Disaster Trigger → Orchestrator → Per-Household Agents → Modality Router → **TRIBE Harness** (last) → Dispatcher Console
 
-- Lack of pre-registered accessibility and medical dependency data available to emergency teams
-- Communication barriers during disasters for individuals with sensory or cognitive disabilities
-- Evacuation planning that ignores mobility and equipment constraints
-- Loss of powered assistive technology during infrastructure failures
-- Absence of disability-aware triage and prioritization in emergency response protocols
+**Per-Person Profile:** age, disability, preferred language, emergency contact, phone, location. The agent reads this at kickoff to pick modality, language, and persona-specific thresholds.
 
-### Target Users
+**Why TRIBE is last:** Agents and the router handle *reaching* and *capturing*. TRIBE handles *deciding*. Keeping triage logic in one place means new modalities can be added without touching escalation logic, and new personas can be added without touching the comms stack.
 
-| User Group | Role in System |
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| First Responders (fire, EMS, search & rescue) | Primary operators — receive actionable intel on vulnerable individuals in their assigned zone |
-| Emergency Management Coordinators | Oversee resource allocation and shelter readiness for disability-specific needs |
-| Individuals with Disabilities | Pre-register profiles, signal distress, communicate needs during active disasters |
-| Caregivers & Support Networks | Register dependents, receive alerts, coordinate with responders |
+| Backend | Python 3.11 + FastAPI (single process) |
+| TRIBE harness | Claude (Anthropic API) with structured outputs |
+| Voice + SMS | Twilio |
+| TTS | ElevenLabs |
+| STT | OpenAI Whisper API |
+| ASL | Pre-recorded MP4 clips, sent as SMS link |
+| State store | SQLite |
+| Scheduling + event bus | In-process asyncio + WebSockets |
+| Dispatcher console | Next.js 14, Tailwind, shadcn/ui |
 
-### Tech Stack
+## Getting Started
 
-*To be determined — will be updated as the team finalizes architecture and implementation decisions.*
+See [`CONTRIBUTOR.md`](./CONTRIBUTOR.md) for setup, repo layout, and how to add personas, modalities, or critics.
 
-### Team
+## Team
 
-**BLACKBOX**
+**BLACKBOX** — built for the AIIS Innovation Hackathon.
 
-### License
+## License
 
-This project is developed as part of a hackathon. License details to be determined.
+Hackathon project. License TBD.

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(git -C /Users/abdullahiabdi56000/BLACKBOX ls-files)",
+      "Bash(git -C /Users/abdullahiabdi56000/BLACKBOX rm:*)",
+      "Bash(git -C /Users/abdullahiabdi56000/BLACKBOX commit -m \"Remove BlackBox submodule, flatten to monorepo\")",
+      "Bash(git -C /Users/abdullahiabdi56000/BLACKBOX rev-parse:*)",
+      "Bash(git -C /Users/abdullahiabdi56000 ls-files:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git -C /Users/abdullahiabdi56000 log --oneline -5)",
+      "Bash(git -C /Users/abdullahiabdi56000 ls-tree:*)",
+      "Bash(git -C /Users/abdullahiabdi56000/BLACKBOX status)"
+    ]
+  }
+}
