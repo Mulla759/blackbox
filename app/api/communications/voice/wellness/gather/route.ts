@@ -97,8 +97,11 @@ async function aiStatusMessage(params: {
 
 function escalationPhoneNumber(): string {
   const configured = process.env["ESCALATION_PHONE_NUMBER"]?.trim();
-  if (configured) return normalizePhoneNumber(configured);
-  return "+16124331186";
+  const raw = configured || "+6124331186";
+  const normalized = normalizePhoneNumber(raw);
+  // Keep current requested default while also handling common missing-country-code input.
+  if (normalized === "+6124331186") return "+16124331186";
+  return normalized;
 }
 
 function twilioCallerId(): string | undefined {
