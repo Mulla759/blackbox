@@ -1,19 +1,25 @@
-import { mkdir } from "node:fs/promises";
+import { mkdirSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { dirname, join } from "node:path";
-import sqlite3 from "sqlite3";
-import { open, type Database } from "sqlite";
 
-let dbPromise: Promise<Database<sqlite3.Database, sqlite3.Statement>> | null = null;
+type DispatchDb = {
+  exec(sql: string): void;
+  get<T>(sql: string, ...params: any[]): T | undefined;
+  all<T>(sql: string, ...params: any[]): T[];
+  run(sql: string, ...params: any[]): unknown;
+};
+
+let dbPromise: Promise<DispatchDb> | null = null;
 
 const DB_PATH = join(process.cwd(), ".data", "blackbox_dispatch.sqlite");
 
-async function seedIfEmpty(db: Database<sqlite3.Database, sqlite3.Statement>) {
-  const row = (await db.get<{ count: number }>(
+async function seedIfEmpty(db: DispatchDb) {
+  const row = db.get<{ count: number }>(
     "SELECT COUNT(*) as count FROM contacts"
-  )) ?? { count: 0 };
+  ) ?? { count: 0 };
   if (row.count > 0) return;
   const now = new Date().toISOString();
-  await db.exec(`
+  db.exec(`
     INSERT INTO contacts (
       id, full_name, phone_number, address, city, state, zip_code, preferred_language,
       accessibility_needs, is_deaf_or_hard_of_hearing, requires_interpreter, interpreter_language,
@@ -30,7 +36,7 @@ async function seedIfEmpty(db: Database<sqlite3.Database, sqlite3.Statement>) {
        'hearing support',1,1,'ASL',1,0,'David Johnson','+16125550114','SMS or interpreter-assisted communication recommended.',0,1, '${now}','${now}');
   `);
 
-  await db.exec(`
+  db.exec(`
     INSERT INTO responders (
       id, full_name, phone_number, role, preferred_language, created_at, updated_at
     ) VALUES
@@ -38,7 +44,7 @@ async function seedIfEmpty(db: Database<sqlite3.Database, sqlite3.Statement>) {
       ('r_2','Nadia Omar','+16125550202','dispatcher_assist','Somali','${now}','${now}');
   `);
 
-  await db.exec(`
+  db.exec(`
     INSERT INTO dispatcher_settings (
       id, dispatcher_name, dispatcher_phone_number, default_language, created_at, updated_at
     ) VALUES
@@ -46,8 +52,8 @@ async function seedIfEmpty(db: Database<sqlite3.Database, sqlite3.Statement>) {
   `);
 }
 
-async function initSchema(db: Database<sqlite3.Database, sqlite3.Statement>) {
-  await db.exec(`
+async function initSchema(db: DispatchDb) {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS contacts (
       id TEXT PRIMARY KEY,
       full_name TEXT,
@@ -106,17 +112,32 @@ async function initSchema(db: Database<sqlite3.Database, sqlite3.Statement>) {
   `);
 }
 
-export async function getDispatchDb() {
+function wrapDb(db: DatabaseSync): DispatchDb {
+  return {
+    exec(sql: string) {
+      db.exec(sql);
+    },
+    get<T>(sql: string, ...params: any[]) {
+      return db.prepare(sql).get(...params) as T | undefined;
+    },
+    all<T>(sql: string, ...params: any[]) {
+      return db.prepare(sql).all(...params) as T[];
+    },
+    run(sql: string, ...params: any[]) {
+      return db.prepare(sql).run(...params);
+    },
+  };
+}
+
+export async function getDispatchDb(): Promise<DispatchDb> {
   if (!dbPromise) {
     dbPromise = (async () => {
-      await mkdir(dirname(DB_PATH), { recursive: true });
-      const db = await open({
-        filename: DB_PATH,
-        driver: sqlite3.Database,
-      });
-      await initSchema(db);
-      await seedIfEmpty(db);
-      return db;
+      mkdirSync(dirname(DB_PATH), { recursive: true });
+      const db = new DatabaseSync(DB_PATH);
+      const wrapped = wrapDb(db);
+      await initSchema(wrapped);
+      await seedIfEmpty(wrapped);
+      return wrapped;
     })();
   }
   return dbPromise;
