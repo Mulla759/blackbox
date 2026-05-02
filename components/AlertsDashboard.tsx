@@ -8,6 +8,14 @@ import {
 } from "react";
 
 const FILTER_ALL = "__all__";
+type AccessibilityImpact = {
+  disaster_id: string;
+  estimated_people_with_disabilities_affected: number;
+  estimated_mobility_support_needs: number;
+  estimated_hearing_vision_support_needs: number;
+  high_priority_shelters: number;
+  high_priority_shelters_count?: number;
+};
 
 function severityAccent(severity: string): string {
   const s = severity.toLowerCase();
@@ -57,6 +65,10 @@ function sortedOptions(values: Set<string>): string[] {
   );
 }
 
+function formatEstimate(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
 export function AlertsDashboard({
   alerts,
   error,
@@ -64,11 +76,13 @@ export function AlertsDashboard({
   alerts: DisasterAlert[];
   error: string | null;
 }) {
-  const [notifyKey, setNotifyKey] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState(FILTER_ALL);
   const [urgency, setUrgency] = useState(FILTER_ALL);
   const [disasterType, setDisasterType] = useState(FILTER_ALL);
+  const [impactByCard, setImpactByCard] = useState<Record<string, AccessibilityImpact>>({});
+  const [impactErrorByCard, setImpactErrorByCard] = useState<Record<string, string>>({});
+  const [impactLoadingId, setImpactLoadingId] = useState<string | null>(null);
 
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
@@ -118,30 +132,35 @@ export function AlertsDashboard({
     setDisasterType(FILTER_ALL);
   }
 
-  async function triggerOutreach(a: DisasterAlert, index: number) {
-    const key = a.sourceId ?? `${index}-${a.type}-${a.location}`;
-    setNotifyKey(key);
+  async function estimateImpact(a: DisasterAlert, index: number) {
+    const rawId = a.sourceId ?? `${a.type}-${a.location}-${index}`;
+    const id = encodeURIComponent(rawId);
+    setImpactErrorByCard((prev) => {
+      const next = { ...prev };
+      delete next[rawId];
+      return next;
+    });
+    setImpactLoadingId(rawId);
     try {
-      const res = await fetch("/api/disasters/communications/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          disaster_event_id: a.sourceId ?? undefined,
-          disaster_event_name: `${a.type} (${a.severity})`,
-          registry_location_query: a.location,
-        }),
+      const res = await fetch(`/api/disasters/${id}/accessibility-impact`, {
+        cache: "no-store",
       });
-      const data = (await res.json()) as {
-        error?: string;
-        recipient_count?: number;
-      };
+      const data = (await res.json()) as AccessibilityImpact & { error?: string };
       if (!res.ok) {
-        alert(data.error ?? "Outreach request failed");
+        setImpactErrorByCard((prev) => ({
+          ...prev,
+          [rawId]: data.error ?? "Could not estimate accessibility impact.",
+        }));
         return;
       }
-      alert(`SMS queued for ${data.recipient_count ?? 0} recipient(s)`);
+      setImpactByCard((prev) => ({ ...prev, [rawId]: data }));
+    } catch {
+      setImpactErrorByCard((prev) => ({
+        ...prev,
+        [rawId]: "Could not estimate accessibility impact.",
+      }));
     } finally {
-      setNotifyKey(null);
+      setImpactLoadingId(null);
     }
   }
 
@@ -265,6 +284,7 @@ export function AlertsDashboard({
             </button>
           </div>
         ) : null}
+
       </div>
 
       {alerts.length === 0 ? (
@@ -280,6 +300,12 @@ export function AlertsDashboard({
               key={`${a.type}-${a.location}-${i}`}
               className={`flex flex-col border border-border border-l-4 bg-card p-5 ${severityStripe(a.severity)}`}
             >
+              {(() => {
+                const cardId = a.sourceId ?? `${a.type}-${a.location}-${i}`;
+                const impact = impactByCard[cardId];
+                const impactError = impactErrorByCard[cardId];
+                return (
+                  <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="font-display text-lg font-extrabold leading-snug tracking-tight md:text-xl">
                   {a.type}
@@ -303,29 +329,68 @@ export function AlertsDashboard({
                   {a.description}
                 </p>
               ) : null}
-              {a.coordinates?.length ? (
-                <p className="mt-4 border-t border-border pt-3 font-mono text-[0.65rem] text-muted-foreground">
-                  Geometry · {a.coordinates.length} lon/lat pair
-                  {a.coordinates.length === 1 ? "" : "s"}
+              <div className="mt-4 border-t border-border pt-4">
+                <p className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-muted-foreground">
+                  Accessibility impact estimate
                 </p>
-              ) : null}
+                {impact ? (
+                  <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
+                    <p className="text-foreground/85">
+                      Estimated people with disabilities affected:{" "}
+                      <strong className="text-base font-extrabold text-white">
+                        {formatEstimate(
+                          impact.estimated_people_with_disabilities_affected
+                        )}
+                      </strong>
+                    </p>
+                    <p className="text-foreground/85">
+                      Estimated mobility-support needs:{" "}
+                      <strong className="text-base font-extrabold text-white">
+                        {formatEstimate(impact.estimated_mobility_support_needs)}
+                      </strong>
+                    </p>
+                    <p className="text-foreground/85">
+                      Estimated hearing/vision support needs:{" "}
+                      <strong className="text-base font-extrabold text-white">
+                        {formatEstimate(
+                          impact.estimated_hearing_vision_support_needs
+                        )}
+                      </strong>
+                    </p>
+                    <p className="text-foreground/85">
+                      High-priority shelters:{" "}
+                      <strong className="text-base font-extrabold text-white">
+                        {formatEstimate(
+                          impact.high_priority_shelters_count ??
+                            impact.high_priority_shelters
+                        )}
+                      </strong>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-foreground/70">
+                    Press estimate to calculate accessibility support needs for this alert.
+                  </p>
+                )}
+                {impactError ? (
+                  <p className="mt-2 text-sm text-[var(--state-critical)]">{impactError}</p>
+                ) : null}
+              </div>
               <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
                 <button
                   type="button"
-                  disabled={notifyKey !== null}
-                  onClick={() => void triggerOutreach(a, i)}
+                  disabled={impactLoadingId !== null}
+                  onClick={() => void estimateImpact(a, i)}
                   className="border border-border bg-background px-3 py-2 font-mono text-[0.6rem] uppercase tracking-[0.12em] hover:border-accent hover:text-accent disabled:opacity-40"
                 >
-                  {notifyKey === (a.sourceId ?? `${i}-${a.type}-${a.location}`)
-                    ? "Sending…"
-                    : "SMS outreach"}
+                  {impactLoadingId === (a.sourceId ?? `${a.type}-${a.location}-${i}`)
+                    ? "Estimating…"
+                    : "Estimate accessibility"}
                 </button>
-                <span className="text-[0.65rem] text-muted-foreground self-center">
-                  Matches contacts in Analytics → Registry by location tokens (MN, counties, …). If no match,
-                  falls back to{" "}
-                  <span className="font-mono text-[0.6rem]">DISASTER_NOTIFY_RECIPIENTS</span>.
-                </span>
               </div>
+                  </>
+                );
+              })()}
             </li>
           ))}
         </ul>

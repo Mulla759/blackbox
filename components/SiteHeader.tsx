@@ -42,7 +42,13 @@ export function SiteHeader() {
             href="/wellness"
             className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
           >
-            SMS check
+            Call check
+          </Link>
+          <Link
+            href="/dashboard"
+            className="rounded-sm px-3 py-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-foreground/90 hover:bg-card hover:text-foreground"
+          >
+            Dashboard
           </Link>
         </nav>
       </div>
