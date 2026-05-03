@@ -1,12 +1,11 @@
 "use client";
 
-import type { DisasterDashboardData, DisasterEvent } from "@/lib/disaster-intel";
+import type { DisasterDashboardData } from "@/lib/disaster-intel";
 import type { DispatcherCase } from "@/lib/tribe-v2/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   initialData: DisasterDashboardData;
-  disasterOptions?: DisasterEvent[];
   mapsApiKey: string;
 };
 
@@ -39,11 +38,7 @@ function severityBadgeClass(sev: string): string {
   }
 }
 
-export function DisasterIntelligenceDashboard({
-  initialData,
-  disasterOptions,
-  mapsApiKey,
-}: Props) {
+export function DisasterIntelligenceDashboard({ initialData, mapsApiKey }: Props) {
   const [data, setData] = useState(initialData);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
@@ -57,12 +52,7 @@ export function DisasterIntelligenceDashboard({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const caseMarkersRef = useRef<google.maps.Marker[]>([]);
-  const disasterMarkersRef = useRef<google.maps.Marker[]>([]);
   const dataRef = useRef(data);
-  const disasterPins = useMemo(
-    () => (disasterOptions && disasterOptions.length > 0 ? disasterOptions : [initialData.disaster]),
-    [disasterOptions, initialData.disaster]
-  );
 
   useEffect(() => {
     dataRef.current = data;
@@ -97,18 +87,10 @@ export function DisasterIntelligenceDashboard({
 
     let cancelled = false;
 
-    const mountMap = async () => {
+    const mountMap = () => {
       if (cancelled || !mapContainerRef.current) return;
       const g = window.google;
       if (!g?.maps) return;
-      if (typeof g.maps.Map !== "function" && typeof g.maps.importLibrary === "function") {
-        await g.maps.importLibrary("maps");
-        await g.maps.importLibrary("marker");
-      }
-      if (typeof g.maps.Map !== "function") {
-        setMapError("Google Maps loaded but Map constructor is unavailable.");
-        return;
-      }
 
       const d = dataRef.current;
       const el = mapContainerRef.current;
@@ -123,33 +105,6 @@ export function DisasterIntelligenceDashboard({
       setMapReady(true);
 
       const info = new g.maps.InfoWindow();
-
-      for (const m of disasterMarkersRef.current) {
-        m.setMap(null);
-      }
-      disasterMarkersRef.current = [];
-
-      for (const dis of disasterPins) {
-        const disasterMarker = new g.maps.Marker({
-          map,
-          position: { lat: dis.latitude, lng: dis.longitude },
-          title: dis.title,
-          icon:
-            dis.id === d.disaster.id
-              ? "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
-              : "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
-        });
-        disasterMarker.addListener("click", () => {
-          info.setContent(
-            `<div style="max-width:260px"><strong>${escapeHtml(dis.title)}</strong><br/>` +
-              `${escapeHtml(dis.location_name)}<br/>${escapeHtml(dis.severity)} · ${escapeHtml(dis.urgency)}<br/>` +
-              `<em>Loading this disaster…</em></div>`
-          );
-          info.open({ map, anchor: disasterMarker });
-          void selectDisaster(dis.id);
-        });
-        disasterMarkersRef.current.push(disasterMarker);
-      }
 
       new g.maps.Marker({
         map,
@@ -217,13 +172,11 @@ export function DisasterIntelligenceDashboard({
     };
 
     if (window.google?.maps) {
-      void mountMap();
+      mountMap();
       return () => {
         cancelled = true;
         setMapReady(false);
         mapRef.current = null;
-        for (const m of disasterMarkersRef.current) m.setMap(null);
-        disasterMarkersRef.current = [];
         if (mapContainerRef.current) mapContainerRef.current.innerHTML = "";
       };
     }
@@ -231,7 +184,7 @@ export function DisasterIntelligenceDashboard({
     const existing = document.querySelector<HTMLScriptElement>(GMAPS_SCRIPT_SELECTOR);
     if (existing) {
       const onLoad = () => {
-        if (!cancelled) void mountMap();
+        if (!cancelled) mountMap();
       };
       if (window.google?.maps) {
         onLoad();
@@ -242,19 +195,17 @@ export function DisasterIntelligenceDashboard({
         cancelled = true;
         setMapReady(false);
         mapRef.current = null;
-        for (const m of disasterMarkersRef.current) m.setMap(null);
-        disasterMarkersRef.current = [];
         existing.removeEventListener("load", onLoad);
         if (mapContainerRef.current) mapContainerRef.current.innerHTML = "";
       };
     }
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&loading=async`;
     script.async = true;
     script.dataset.blackboxGmaps = "1";
     script.onload = () => {
-      if (!cancelled) void mountMap();
+      if (!cancelled) mountMap();
     };
     script.onerror = () => {
       if (!cancelled) {
@@ -267,11 +218,9 @@ export function DisasterIntelligenceDashboard({
       cancelled = true;
       setMapReady(false);
       mapRef.current = null;
-      for (const m of disasterMarkersRef.current) m.setMap(null);
-      disasterMarkersRef.current = [];
       if (mapContainerRef.current) mapContainerRef.current.innerHTML = "";
     };
-  }, [mapsApiKey, disasterPins, data.disaster.id]);
+  }, [mapsApiKey]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -352,18 +301,6 @@ export function DisasterIntelligenceDashboard({
     }
   }
 
-  async function selectDisaster(disasterId: string) {
-    if (!disasterId || disasterId === data.disaster.id) return;
-    const res = await fetch(`/api/disasters/${encodeURIComponent(disasterId)}/dashboard`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return;
-    const payload = (await res.json()) as DisasterDashboardData;
-    setData(payload);
-    setEstimateError(null);
-    setChat([]);
-  }
-
   async function sendChat(message: string) {
     if (!message.trim()) return;
     setChatBusy(true);
@@ -395,22 +332,6 @@ export function DisasterIntelligenceDashboard({
     <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 py-5 sm:gap-5 sm:px-6 lg:grid-cols-12">
       <section className="min-w-0 space-y-4 lg:col-span-7 xl:col-span-8">
         <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-muted-foreground">
-              Active disaster
-            </p>
-            <select
-              value={data.disaster.id}
-              onChange={(e) => void selectDisaster(e.target.value)}
-              className="max-w-full border border-border bg-background px-2 py-1 font-mono text-[0.68rem]"
-            >
-              {disasterPins.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title} · {d.location_name}
-                </option>
-              ))}
-            </select>
-          </div>
           <h1 className="font-display text-2xl font-extrabold">{data.disaster.title}</h1>
           <div className="mt-2 flex flex-wrap gap-2">
             <span className="bg-[var(--state-critical)] px-2 py-1 font-mono text-xs font-bold text-white">

@@ -56,3 +56,24 @@ See [`Contributor.md`](./Contributor.md) for setup, repo layout, and how to add 
 ## License
 
 Hackathon project. License TBD.
+## Vapi AI Agent Add-on
+
+The home page includes a Vapi-powered Lifeline voice agent add-on. It adds a large vermillion safety-call button using the existing BLACKBOX accent color (`#FF3D00`). The button calls the local Next.js API route:
+
+```txt
+POST /api/vapi/call/start
+```
+
+That route starts an outbound Vapi call using:
+
+```env
+VAPI_API_KEY=
+VAPI_ASSISTANT_ID=
+VAPI_PHONE_NUMBER_ID=
+NEXT_PUBLIC_BLACKBOX_HOME_VAPI_PHONE=
+BLACKBOX_HOME_VAPI_PHONE=
+```
+
+Create `.env.local` from `.env.local.example` and fill in your Vapi values. `VAPI_PHONE_NUMBER_ID` must be the Vapi phone-number UUID, not the visible `+1...` phone number.
+
+The transfer behavior is configured inside the Vapi assistant with a `transferCall` tool. The assistant should transfer immediately when the caller says words like emergency, help, support, unsafe, hurt, injured, trapped, or asks for a human.

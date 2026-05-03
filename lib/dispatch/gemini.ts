@@ -11,7 +11,7 @@ export async function summarizeRecentCallLogs(): Promise<string> {
     "Do not reveal private personal data. Focus on needs, urgency, and recommended next action.\n\n" +
     JSON.stringify(callLogs);
   const endpoint =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {

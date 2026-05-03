@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     "Use words like estimated/probable. Prioritize emergency response and accessibility support recommendations.";
 
   const endpoint =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   let text = "";

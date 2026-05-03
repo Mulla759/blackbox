@@ -30,7 +30,8 @@ describe("dispatcher communication system", () => {
     process.env["TWILIO_VOICE_FROM_NUMBER"] = "+16125559999";
     process.env["PUBLIC_APP_URL"] = "https://example.test";
     process.env["VAPI_API_KEY"] = "vapi_key";
-    process.env["VAPI_ASSISTANT_ID"] = "asst_test";
+    process.env["VAPI_ASSISTANT_ID"] = "1d54238a-39e4-4931-8fcb-c651f4fd1337";
+    process.env["VAPI_PHONE_NUMBER_ID"] = "11111111-2222-3333-4444-555555555555";
   });
 
   afterEach(() => {

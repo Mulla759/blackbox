@@ -180,7 +180,7 @@ export async function getContactById(id: string) {
 
 export async function listContacts() {
   const db = await getDispatchDb();
-  return db.all<ContactRecord>("SELECT * FROM contacts ORDER BY updated_at DESC");
+  return db.all<ContactRecord[]>("SELECT * FROM contacts ORDER BY updated_at DESC");
 }
 
 export async function searchContacts(params: {
@@ -212,7 +212,7 @@ export async function searchContacts(params: {
     values.push(`%${params.query}%`, `%${params.query}%`, `%${params.query}%`, `%${params.query}%`);
   }
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  return db.all<ContactRecord>(`SELECT * FROM contacts ${clause} ORDER BY updated_at DESC`, ...values);
+  return db.all<ContactRecord[]>(`SELECT * FROM contacts ${clause} ORDER BY updated_at DESC`, ...values);
 }
 
 export async function logCommunication(entry: {
@@ -258,7 +258,7 @@ export async function logCommunication(entry: {
 
 export async function logsForContact(contactId: string) {
   const db = await getDispatchDb();
-  return db.all<CommunicationLogRecord>(
+  return db.all<CommunicationLogRecord[]>(
     "SELECT * FROM communication_logs WHERE contact_id = ? ORDER BY created_at DESC",
     contactId
   );
@@ -266,7 +266,7 @@ export async function logsForContact(contactId: string) {
 
 export async function recentLogs(limit = 120) {
   const db = await getDispatchDb();
-  return db.all<CommunicationLogRecord>(
+  return db.all<CommunicationLogRecord[]>(
     "SELECT * FROM communication_logs ORDER BY created_at DESC LIMIT ?",
     limit
   );
@@ -274,7 +274,7 @@ export async function recentLogs(limit = 120) {
 
 export async function listResponders() {
   const db = await getDispatchDb();
-  return db.all<ResponderRecord>("SELECT * FROM responders ORDER BY created_at DESC");
+  return db.all<ResponderRecord[]>("SELECT * FROM responders ORDER BY created_at DESC");
 }
 
 export async function dispatcherSettings() {

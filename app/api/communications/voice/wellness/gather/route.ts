@@ -59,7 +59,7 @@ async function aiStatusMessage(params: {
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     const endpoint =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
     const res = await fetch(`${endpoint}?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,11 +97,8 @@ async function aiStatusMessage(params: {
 
 function escalationPhoneNumber(): string {
   const configured = process.env["ESCALATION_PHONE_NUMBER"]?.trim();
-  const raw = configured || "+6124331186";
-  const normalized = normalizePhoneNumber(raw);
-  // Keep current requested default while also handling common missing-country-code input.
-  if (normalized === "+6124331186") return "+16124331186";
-  return normalized;
+  if (configured) return normalizePhoneNumber(configured);
+  return "+16124331186";
 }
 
 function twilioCallerId(): string | undefined {
